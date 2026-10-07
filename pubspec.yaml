@@ -1,0 +1,44 @@
+name: labaik
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  http: ^1.2.0
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/home/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/Main Logo.jpeg"
+  adaptive_icon_background: "#1c3b32"
+  adaptive_icon_foreground: "assets/images/Main Logo.jpeg"
+
+flutter_native_splash:
+  color: "#1c3b32"
+  android_12:
+    color: "#1c3b32"
+    icon_background_color: "#1c3b32"
+    image: "assets/images/splash_transparent.png"
