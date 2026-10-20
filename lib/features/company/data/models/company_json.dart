@@ -72,7 +72,7 @@ abstract final class CompanyJson {
         id: _str(j, 'id'),
         name: _str(j, 'name'),
         tripId: _str(j, 'tripId'),
-        tripName: trip?.title ?? '',
+        tripName: trip?.title ?? _opt(j, 'tripName') ?? '',
         joinCode: _str(j, 'joinCode'),
         supervisorName: _opt(j, 'supervisorName'),
         memberCount: j.optionalInt('pilgrimCount') ?? 0,
@@ -129,7 +129,8 @@ abstract final class CompanyJson {
         suspended: j.field('isDisabled') == true || j.field('isSuspended') == true,
       );
 
-  /// NotificationDto — للشركة: 3 مجموعة جديدة، 4 تفعيل مشرف، 5 مجموعة بلا مشرف (والباقي بعنوان عام)
+  /// NotificationDto — للشركة: 3 مجموعة جديدة، 4 تفعيل مشرف، 5 مجموعة بلا مشرف،
+  /// 13/14 مشرف أضاف/شال معتمر (preview = اسم المعتمر) — والباقي بعنوان عام
   /// 3 و5 بالكرت الأغمق (زي Figma: "تم إنشاء مجموعة جديدة")
   static CompanyNotification? notification(Map<String, dynamic> j) {
     final created = DateTime.tryParse(_str(j, 'createdAtUtc'))?.toLocal();

@@ -61,7 +61,7 @@ abstract final class CompanyProfileText {
   static const noGroups = Tx('لا يشرف على أي مجموعة بعد', 'Not supervising any group yet');
   static const actions = Tx('التحكم بالحساب', 'Account control');
   static const tempPassword = Tx('إصدار كلمة مرور مؤقتة', 'Issue a temporary password');
-  static const tempPasswordDone = Tx('تم إرسال كلمة مرور مؤقتة جديدة إلى بريد المشرف', 'A new temporary password was emailed to the supervisor');
+  static const tempPasswordDone = Tx('تم إرسال كلمة مرور مؤقتة جديدة إلى بريد المشرف، وسيُطلب منه تغييرها عند أول دخول', 'A new temporary password was emailed to the supervisor; they will be asked to change it at first sign-in');
   static String tempPasswordValue(Object p) => tr('كلمة المرور المؤقتة: $p', 'Temporary password: $p');
   static const suspend = Tx('إيقاف الحساب', 'Suspend account');
   static const resume = Tx('تفعيل الحساب', 'Reactivate account');

@@ -11,10 +11,12 @@ import '../../../auth/data/token_refresher.dart';
 //   GET  /company/trips | /trips/{id}    → TripSummaryDto[] | TripDto (الوجهات بالتفاصيل بس)
 //   POST /company/trips                  → TripDto
 //   GET/POST /company/trips/{id}/groups  → CompanyGroupDto[] | CompanyGroupDto (بلا مشرف)
+//   GET  /company/groups                 → كل مجموعات الشركة بطلب واحد (CompanyGroupListItemDto[] — الأقرب رحلة أول)
 //   GET/POST /company/groups/{id}/members (+ /{userId}) → صفوف الأعضاء / بطاقة العضو / إضافة معتمر بالإيميل
 //   PUT  /company/groups/{id}/supervisor → تعيين مشرف من قائمة الشركة بالإيميل
 //   GET/POST /company/supervisors        → قائمة مشرفي الشركة / إضافة مشرف (كلمة مؤقتة بالإيميل)
-//   GET  /notifications                  → إشعارات صاحب الحساب (أنواع 3، 4، 5 للشركة)
+//   GET  /notifications                  → إشعارات صاحب الحساب (للشركة: 3، 4، 5، و13/14 لما المشرف يضيف/يشيل معتمر)
+//   POST /files                          → رفع صورة (5MB) أو PDF (10MB) → { url }
 // -------------------------------------------------------------
 class CompanyApi {
   final ApiClient _client;
@@ -27,7 +29,7 @@ class CompanyApi {
 
   Future<Map<String, dynamic>> updateMe(Map<String, dynamic> body) async => _map(await _client.putJson('/company/me', body: body));
 
-  /// رفع صورة (الشعار): POST /files multipart → { url } — لسا مش بالسيرفر (404 لحد ما يضيفه إبراهيم)
+  /// رفع صورة (الشعار): POST /files multipart → { url } (jpg/png/webp لحد 5MB)
   Future<String> uploadFile(String path) async {
     final data = _map(await _client.postMultipart('/files', files: {'file': path}));
     final url = data['url']?.toString() ?? '';
@@ -42,6 +44,8 @@ class CompanyApi {
   Future<Map<String, dynamic>> trip(String id) async => _map(await _client.getJson('/company/trips/$id'));
 
   Future<Map<String, dynamic>> createTrip(Map<String, dynamic> body) async => _map(await _client.postJson('/company/trips', body: body));
+
+  Future<List<Map<String, dynamic>>> allGroups() async => _list(await _client.getJson('/company/groups'));
 
   Future<List<Map<String, dynamic>>> tripGroups(String tripId) async => _list(await _client.getJson('/company/trips/$tripId/groups'));
 
@@ -61,7 +65,7 @@ class CompanyApi {
 
   Future<Map<String, dynamic>> addSupervisor(Map<String, dynamic> body) async => _map(await _client.postJson('/company/supervisors', body: body));
 
-  // التحكم بمشرف (لسا مش بالسيرفر — ملف إبراهيم): حذف من الشركة / إيقاف وتفعيل / كلمة مؤقتة جديدة
+  // التحكم بمشرف: حذف من الشركة / إيقاف وتفعيل / كلمة مؤقتة جديدة (بتنبعت بالإيميل وبتلزمه يغيّرها بأول دخول)
   Future<void> removeSupervisor(String userId) => _client.delete('/company/supervisors/$userId');
 
   Future<void> setSupervisorSuspended(String userId, {required bool suspended}) => _client.postJson('/company/supervisors/$userId/${suspended ? 'disable' : 'enable'}');

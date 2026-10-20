@@ -5,8 +5,9 @@ import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/l10n/common_text.dart';
 import '../../../../core/utils/token_storage.dart';
 import '../../../auth/data/auth_session.dart';
+import '../../../auth/data/token_refresher.dart';
 import '../../../auth/presentation/pages/auth_welcome_screen.dart';
-import '../../../auth/presentation/pages/reset_password_screen.dart';
+import '../../../auth/presentation/pages/create_new_password_screen.dart';
 import '../../../family/presentation/controllers/family_controller.dart';
 import '../../../group/data/sources/group_realtime.dart';
 import '../../../group/presentation/controllers/group_controller.dart';
@@ -253,7 +254,7 @@ abstract final class CompanyController {
     );
   }
 
-  static void changePassword(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
+  static void changePassword(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateNewPasswordScreen.change()));
 
   static void openTerms(BuildContext context) => TermsController.open(context);
 
@@ -261,6 +262,7 @@ abstract final class CompanyController {
   static Future<void> logout(BuildContext context) async {
     await FamilyController.stopLocationSharing();
     await GroupController.stopLocationSharing();
+    await TokenRefresher.revoke();
     await TokenStorage.clearTokens();
     await AuthSession.clear();
     GroupRealtime.reset();

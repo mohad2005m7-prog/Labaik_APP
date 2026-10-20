@@ -5,9 +5,10 @@ import '../../../../core/l10n/common_text.dart';
 import '../../../../core/l10n/tx.dart';
 import '../../../../core/utils/token_storage.dart';
 import '../../../auth/data/auth_session.dart';
+import '../../../auth/data/token_refresher.dart';
 import '../../../auth/presentation/pages/auth_welcome_screen.dart';
 import '../../../group/data/sources/group_realtime.dart';
-import '../../../auth/presentation/pages/reset_password_screen.dart';
+import '../../../auth/presentation/pages/create_new_password_screen.dart';
 import '../../domain/entities/announcement.dart';
 import '../../domain/entities/group_member.dart';
 import '../../domain/entities/supervisor_group.dart';
@@ -75,11 +76,12 @@ class SupervisorController {
   }
 
   /// "تغيير كلمة المرور" → نفس مسار نسيت كلمة المرور (رمز على الإيميل ثم كلمة مرور جديدة)
-  static void changePassword(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
+  static void changePassword(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateNewPasswordScreen.change()));
 
   /// "تسجيل الخروج": حذف التوكن وبيانات المشرف المحفوظة والرجوع لشاشة الدخول/إنشاء الحساب
   static Future<void> logout(BuildContext context) async {
     final repository = context.read<SupervisorRepository>();
+    await TokenRefresher.revoke();
     await TokenStorage.clearTokens();
     await AuthSession.clear();
     GroupRealtime.reset();

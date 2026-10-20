@@ -114,6 +114,36 @@ class AuthApiService {
     );
   }
 
+  // 7.5 تغيير كلمة المرور وأنا داخل (الحالية + الجديدة) — بيرجع توكنات جديدة (mustChangePassword: false)
+  static Future<http.Response> changePassword({required String token, required String currentPassword, required String newPassword}) async {
+    final url = Uri.parse('$baseUrl/change-password');
+    return await http.post(
+      url,
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode({'currentPassword': currentPassword, 'newPassword': newPassword}),
+    );
+  }
+
+  // 7.6 تسجيل الخروج: إلغاء الـ refreshToken على السيرفر (ما بيحتاج accessToken)
+  static Future<http.Response> logout({required String refreshToken}) async {
+    final url = Uri.parse('$baseUrl/logout');
+    return await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'refreshToken': refreshToken}),
+    ).timeout(const Duration(seconds: 6));
+  }
+
+  /// كود الخطأ من رد السيرفر (ProblemDetails "code": Auth.AccountDisabled، Supervisor.Suspended، ...)
+  static String? errorCode(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      return decoded is Map<String, dynamic> ? decoded['code']?.toString() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // 8. جلب بيانات المستخدم الحالي
   static Future<http.Response> getMe({required String token}) async {
     final url = Uri.parse('$baseUrl/me');

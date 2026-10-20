@@ -18,5 +18,9 @@ abstract final class AuthMessagesText {
   static const googleNotReady = Tx('الدخول عبر Google لسا مش مفعّل، جرّب لاحقاً', "Google sign-in isn't enabled yet, try again later");
   static const googleEmailNotVerified = Tx('بريد حساب Google غير مؤكد', 'Your Google email is not verified');
   static const googleFailed = Tx('تعذّر الدخول عبر Google، حاول مرة أخرى', "Couldn't sign in with Google, please try again");
+  static const accountDisabled = Tx('هذا الحساب موقوف، تواصل مع الإدارة', 'This account is disabled, please contact support');
+  static const supervisorSuspended = Tx('حسابك كمشرف موقوف من الشركة، تواصل معها', 'Your supervisor account is suspended by your company');
+  static const emailNotConfirmed = Tx('البريد الإلكتروني غير مؤكد بعد', 'Your email is not confirmed yet');
+  static const changeFailed = Tx('تعذّر تغيير كلمة المرور، حاول مرة أخرى', "Couldn't change the password, please try again");
   static const dashboardOnly = Tx('هذا الحساب للوحة التحكم على الويب فقط', 'This account is for the web dashboard only');
 }

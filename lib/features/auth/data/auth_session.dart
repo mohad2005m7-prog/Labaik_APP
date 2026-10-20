@@ -73,5 +73,9 @@ abstract final class AuthSession {
     return (await current())?.id;
   }
 
+  /// حساب انعمل بكلمة مرور مؤقتة (شركة / مشرف / معتمر أضافته الشركة): لازم يغيّرها قبل أي إشي تاني
+  /// السيرفر بيحطها بالتوكن (pwd_change) — وكل الطلبات التانية بترجع 403 Auth.PasswordChangeRequired لحد ما يغيّرها
+  static Future<bool> mustChangePassword() async => (await TokenStorage.accessTokenClaims())?['pwd_change']?.toString() == 'true';
+
   static Future<void> clear() async => (await SharedPreferences.getInstance()).remove(_key);
 }

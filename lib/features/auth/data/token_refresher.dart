@@ -5,7 +5,7 @@ import 'auth_session.dart';
 // -------------------------------------------------------------
 // تجديد الـ accessToken بالـ refreshToken المحفوظ لما ينتهي (حتى يضل المستخدم داخل حسابه)
 // بطبقة الـ data حتى تستخدمه أي طلبات محمية (ApiClient) بدون ما تعتمد على شاشات الدخول
-// التوكن بيعيش 15 دقيقة، والـ refreshToken بينستعمل مرة وحدة (فبنحفظ الجديد دايماً)
+// التوكن بيعيش 30 دقيقة والـ refreshToken لـ 90 يوم، وبينستعمل مرة وحدة (فبنحفظ الجديد دايماً)
 // -------------------------------------------------------------
 abstract final class TokenRefresher {
   static Future<String?>? _running;
@@ -26,6 +26,17 @@ abstract final class TokenRefresher {
       return tokens['accessToken'];
     } catch (_) {
       return null;
+    }
+  }
+
+  /// تسجيل الخروج: بنلغي الـ refreshToken على السيرفر (لو ما في نت بنكمل عادي — بينتهي لحاله)
+  static Future<void> revoke() async {
+    final refreshToken = await TokenStorage.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) return;
+    try {
+      await AuthApiService.logout(refreshToken: refreshToken);
+    } catch (_) {
+      // بلا نت
     }
   }
 

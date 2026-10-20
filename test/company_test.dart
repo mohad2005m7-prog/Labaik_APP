@@ -214,6 +214,28 @@ void main() {
     ]);
   });
 
+  test('server (20 Oct): destinations come with the trips list, all groups in one /company/groups call', () async {
+    final server = fakeServer({
+      'GET /company/trips': [
+        {'id': 't1', 'name': 'رحلة العمرة الأولى', 'pilgrimageType': 1, 'departureDate': '2026-11-20', 'returnDate': '2026-11-30', 'status': 1, 'destinations': ['مكة المكرمة', 'المدينة المنورة']},
+        {'id': 't2', 'name': 'رحلة الحج', 'pilgrimageType': 2, 'departureDate': '2025-01-01', 'returnDate': '2025-01-10', 'status': 2, 'destinations': ['مكة المكرمة']},
+      ],
+      'GET /company/groups': [
+        {'id': 'g2', 'name': 'مجموعة ب', 'joinCode': 'ABC123', 'tripId': 't2', 'tripName': 'رحلة الحج', 'tripDepartureDate': '2025-01-01', 'pilgrimCount': 38, 'supervisorName': 'عمر'},
+        {'id': 'g1', 'name': 'مجموعة أ', 'joinCode': 'K7P2QX', 'tripId': 't1', 'tripName': 'رحلة العمرة الأولى', 'tripDepartureDate': '2026-11-20', 'pilgrimCount': 0, 'supervisorName': null},
+      ],
+    });
+    final repo = CompanyRepositoryImpl(api: CompanyApi(server.client));
+    expect((await repo.trips()).map((t) => t.destinations), ['مكة المكرمة، المدينة المنورة', 'مكة المكرمة']);
+    final groups = await repo.groups();
+    expect(groups.map((g) => (g.name, g.tripName, g.status, g.memberCount, g.supervisorName, g.hajj)), [
+      ('مجموعة ب', 'رحلة الحج', CompanyGroupStatus.ended, 38, 'عمر', true),
+      ('مجموعة أ', 'رحلة العمرة الأولى', CompanyGroupStatus.active, 0, null, false),
+    ]);
+    // ولا طلب لتفاصيل رحلة أو مجموعات رحلة
+    expect(server.requests.where((r) => r.startsWith('GET /company/trips/')), isEmpty);
+  });
+
   test('server: create trip sends the backend contract (numbers + yyyy-MM-dd)', () async {
     final server = fakeServer({
       'POST /company/trips': {'id': 't9', 'name': 'عمرة ديسمبر', 'destinations': ['مكة المكرمة'], 'departureDate': '2026-12-10', 'returnDate': null, 'status': 1},

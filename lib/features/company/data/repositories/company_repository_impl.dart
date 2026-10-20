@@ -1,3 +1,4 @@
+import '../../../../core/network/api_exception.dart';
 import '../../../auth/data/auth_session.dart';
 import '../../domain/entities/company_group.dart';
 import '../../domain/entities/company_member.dart';
@@ -12,7 +13,8 @@ import '../sources/company_api.dart';
 // -------------------------------------------------------------
 // واجهة الشركة من سيرفر لبيك (/company):
 // الرئيسية = /company/me (اسم الشركة) + /company/home (الأرقام)
-// الرحلات = /company/trips وتفاصيل كل رحلة (الوجهات) — المجموعات = مجموعات كل رحلة (ما في endpoint لكل المجموعات)
+// الرحلات = /company/trips (الوجهات بالقائمة — وسيرفر أقدم: من تفاصيل كل رحلة)
+// المجموعات = /company/groups بطلب واحد (وسيرفر أقدم بلاه: مجموعات كل رحلة)
 // -------------------------------------------------------------
 class CompanyRepositoryImpl implements CompanyRepository {
   CompanyRepositoryImpl({CompanyApi? api}) : _api = api ?? CompanyApi.server();
@@ -49,9 +51,10 @@ class CompanyRepositoryImpl implements CompanyRepository {
   @override
   Future<List<CompanyTrip>> trips() async {
     final summaries = await _api.trips();
-    // الملخص ما فيه وجهات — بنجيبها من تفاصيل كل رحلة بالتوازي (ولو فشلت وحدة بتنعرض بلا وجهات)
+    // الوجهات صارت بالقائمة — لو السيرفر أقدم (ما فيها) بنجيبها من تفاصيل كل رحلة بالتوازي (ولو فشلت وحدة بتنعرض بلا وجهات)
     final destinations = await Future.wait([
-      for (final t in summaries) _api.trip(t['id'].toString()).then(CompanyJson.destinationsOf, onError: (_) => const <String>[]),
+      for (final t in summaries)
+        t['destinations'] is List ? Future.value(CompanyJson.destinationsOf(t)) : _api.trip(t['id'].toString()).then(CompanyJson.destinationsOf, onError: (_) => const <String>[]),
     ]);
     return [for (final (i, t) in summaries.indexed) CompanyJson.trip(t, destinations: destinations[i])];
   }
@@ -64,7 +67,21 @@ class CompanyRepositoryImpl implements CompanyRepository {
 
   @override
   Future<List<CompanyGroup>> groups() async {
-    final trips = [for (final t in await _api.trips()) CompanyJson.trip(t)];
+    final results = await Future.wait<Object>([_api.trips(), _api.allGroups().then<Object>((v) => v, onError: (Object e) => e)]);
+    final trips = [for (final t in results[0] as List<Map<String, dynamic>>) CompanyJson.trip(t)];
+    final all = results[1];
+    final today = DateTime.now();
+    if (all is List<Map<String, dynamic>>) {
+      // نوع الرحلة (حج/عمرة) وانتهاءها من قائمة الرحلات
+      final byId = {for (final t in trips) t.id: t};
+      return [for (final g in all) CompanyJson.group(g, trip: byId[g['tripId']?.toString()], today: today)];
+    }
+    if (all is! ApiException || !all.isMissingOnServer) throw all;
+    return _groupsPerTrip(trips, today);
+  }
+
+  /// سيرفر أقدم بلا /company/groups: مجموعات كل رحلة لحالها
+  Future<List<CompanyGroup>> _groupsPerTrip(List<CompanyTrip> trips, DateTime today) async {
     // رحلة وحدة فشلت ما بتوقّف الباقي (مجموعاتها بتغيب لحد التحديث الجاي) — بس لو كلهم فشلوا فهو خطأ (مش "ما في مجموعات")
     Object? failure;
     final perTrip = await Future.wait([
@@ -75,7 +92,6 @@ class CompanyRepositoryImpl implements CompanyRepository {
         }),
     ]);
     if (failure != null && perTrip.every((g) => g.isEmpty)) throw failure!;
-    final today = DateTime.now();
     return [
       for (final (i, list) in perTrip.indexed)
         for (final g in list) CompanyJson.group(g, trip: trips[i], today: today),

@@ -4,8 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/l10n/common_text.dart';
 import '../../../../core/utils/token_storage.dart';
 import '../../../auth/data/auth_session.dart';
+import '../../../auth/data/token_refresher.dart';
 import '../../../auth/presentation/pages/auth_welcome_screen.dart';
-import '../../../auth/presentation/pages/reset_password_screen.dart';
+import '../../../auth/presentation/pages/create_new_password_screen.dart';
 import '../../../family/presentation/controllers/family_controller.dart';
 import '../../../group/data/sources/group_realtime.dart';
 import '../../../group/presentation/controllers/group_controller.dart';
@@ -39,7 +40,7 @@ class PilgrimAccountController {
   static Future<String?> savedPhoto() async => (await _repository.savedProfile())?.photo;
 
   /// "تغيير كلمة المرور" → نفس مسار نسيت كلمة المرور (رمز على الإيميل ثم كلمة مرور جديدة)
-  static void changePassword(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
+  static void changePassword(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateNewPasswordScreen.change()));
 
   static void showMessage(BuildContext context, String text) {
     ScaffoldMessenger.of(context)
@@ -54,6 +55,7 @@ class PilgrimAccountController {
   static Future<void> logout(BuildContext context) async {
     await FamilyController.stopLocationSharing();
     await GroupController.stopLocationSharing();
+    await TokenRefresher.revoke();
     await TokenStorage.clearTokens();
     await AuthSession.clear();
     GroupRealtime.reset();

@@ -13,12 +13,16 @@ abstract final class CompanyNotificationsText {
   static const groupCreated = Tx('تم إنشاء مجموعة جديدة', 'New group created');
   static const supervisorActivated = Tx('تم تفعيل حساب مشرف', 'Supervisor activated');
   static const groupWithoutSupervisor = Tx('مجموعة بدون مشرف', 'Group without a supervisor');
+  static const memberAdded = Tx('أضاف المشرف معتمراً للمجموعة', 'A supervisor added a pilgrim');
+  static const memberRemoved = Tx('أزال المشرف معتمراً من المجموعة', 'A supervisor removed a pilgrim');
   static const other = Tx('إشعار جديد', 'New notification');
 
   static String titleFor(int type) => switch (type) {
         3 => groupCreated(),
         4 => supervisorActivated(),
         5 => groupWithoutSupervisor(),
+        13 => memberAdded(),
+        14 => memberRemoved(),
         _ => other(),
       };
 

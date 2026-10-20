@@ -14,6 +14,7 @@ import '../../data/models/account_type.dart';
 import '../../data/models/trip_setup_data.dart';
 import '../../data/token_refresher.dart';
 import '../l10n/auth_messages_text.dart';
+import '../l10n/new_password_text.dart';
 import '../pages/auth_welcome_screen.dart';
 import '../pages/create_new_password_screen.dart';
 import '../pages/home_screen.dart';
@@ -29,7 +30,11 @@ class AuthController {
   // - أول مرة بيفتح التطبيق → شاشات الترحيب
   static Future<Widget> initialScreen() async {
     final token = await TokenStorage.getAccessToken();
-    if (token != null && token.isNotEmpty) return await homeScreen() ?? const AuthWelcomeScreen();
+    if (token != null && token.isNotEmpty) {
+      // دخل بكلمة مرور مؤقتة وسكّر التطبيق قبل ما يغيّرها → لازم يغيّرها أول
+      if (await AuthSession.mustChangePassword()) return const CreateNewPasswordScreen.change(forced: true);
+      return await homeScreen() ?? const AuthWelcomeScreen();
+    }
     if (!await AppPreferences.isOnboardingSeen()) return const OnboardingScreen();
     return const AuthWelcomeScreen();
   }
@@ -108,6 +113,18 @@ class AuthController {
         await AuthSession.saveFromResponse(response.body);
         await AccountRegistry.signedIn(email);
 
+        // كلمة مرور مؤقتة (حساب انعمل من فوق): لازم يغيّرها قبل ما يفوت — السيرفر رافض أي طلب تاني لحد ما يغيّرها
+        if (await AuthSession.mustChangePassword()) {
+          setLoading(false);
+          if (!context.mounted) return;
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => CreateNewPasswordScreen.change(forced: true, knownPassword: password)),
+            (route) => false,
+          );
+          return;
+        }
+
         // واجهته حسب نوع حسابه هو (مشرف / معتمر / شركة) — من الحسابات المسجلة أو السيرفر
         final home = await homeScreen();
         setLoading(false);
@@ -124,8 +141,15 @@ class AuthController {
       } else {
         setLoading(false);
         if (!context.mounted) return;
+        // الحساب موقوف (من الأدمن أو شركته) أو البريد مش مؤكد — رسالة واضحة بدل "بيانات غير صحيحة"
+        final message = switch (AuthApiService.errorCode(response.body)) {
+          'Auth.AccountDisabled' => AuthMessagesText.accountDisabled(),
+          'Supervisor.Suspended' => AuthMessagesText.supervisorSuspended(),
+          'Auth.EmailNotConfirmed' => AuthMessagesText.emailNotConfirmed(),
+          _ => AuthMessagesText.loginInvalid(),
+        };
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AuthMessagesText.loginInvalid())),
+          SnackBar(content: Text(message)),
         );
       }
     } catch (e) {
@@ -294,6 +318,59 @@ class AuthController {
         SnackBar(content: Text('${AuthMessagesText.errorPrefix()}$e')),
       );
     }
+  }
+
+  // 5.5 تغيير كلمة المرور وأنا داخل (الحالية + الجديدة) — [forced] = بعد كلمة مرور مؤقتة: بعدها بيفوت على حسابه
+  static Future<void> changePassword({
+    required BuildContext context,
+    required String currentPassword,
+    required String newPassword,
+    required bool forced,
+    required Function(bool) setLoading,
+  }) async {
+    setLoading(true);
+    try {
+      final token = await TokenRefresher.validAccessToken();
+      if (token == null || token.isEmpty) {
+        setLoading(false);
+        if (context.mounted) await signOutToWelcome(context);
+        return;
+      }
+      final response = await AuthApiService.changePassword(token: token, currentPassword: currentPassword, newPassword: newPassword);
+      if (response.statusCode != 200) {
+        setLoading(false);
+        if (!context.mounted) return;
+        showMessage(context, AuthApiService.errorCode(response.body) == 'Auth.InvalidCredentials' ? NewPasswordText.wrongCurrent() : AuthMessagesText.changeFailed());
+        return;
+      }
+      // توكنات جديدة (والجلسات التانية انلغت)
+      final tokens = TokenStorage.extractTokens(response.body);
+      await TokenStorage.saveTokens(accessToken: tokens['accessToken'], refreshToken: tokens['refreshToken']);
+      await AuthSession.saveFromResponse(response.body);
+      final home = forced ? await homeScreen() : null;
+      setLoading(false);
+      if (!context.mounted) return;
+      showMessage(context, AuthMessagesText.passwordChanged());
+      if (!forced) {
+        Navigator.pop(context);
+        return;
+      }
+      if (home == null) return showMessage(context, AuthMessagesText.dashboardOnly());
+      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => home), (route) => false);
+    } catch (e) {
+      setLoading(false);
+      if (!context.mounted) return;
+      showMessage(context, '${AuthMessagesText.errorPrefix()}$e');
+    }
+  }
+
+  /// خروج بدون ما يكمّل (من شاشة تغيير كلمة المرور الإجباري)
+  static Future<void> signOutToWelcome(BuildContext context) async {
+    await TokenRefresher.revoke();
+    await TokenStorage.clearTokens();
+    await AuthSession.clear();
+    if (!context.mounted) return;
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const AuthWelcomeScreen()), (route) => false);
   }
 
   // 6. تعيين كلمة المرور الجديدة
