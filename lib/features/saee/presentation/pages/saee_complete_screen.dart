@@ -7,17 +7,13 @@ import '../../../tawaf/presentation/widgets/tawaf_step_spec.dart';
 import '../l10n/saee_steps_text.dart';
 
 // -------------------------------------------------------------
-// "الحمدلله، أتممت نسكك" — الشاشة الختامية للعمرة (Figma)
-//   headline (244×22) + sub-headline (359×38) + illustration
-//   + دعاء الختام (307×199) + زر "إنهاء الرحلة"
-//
-// مقاسات Figma (393×960 — أطول من العادة):
-//   subtitle: TawafTextBox(21, 117, 353)
-//   headline: left=16, top=171, 244×22 (semiBold green)
-//   sub-headline: left=17, top=203, 359×38 (semiBold accent)
-//   illustration: left=131, top=255, 130×130 — [GAP: assets/images/saee/complete.png]
-//   دعاء: TawafTextBox(43, 399, 307), maxH=220
-//   button: Rect.fromLTWH(17, 634, 361, 50)
+// "الحمدلله، أتممت نسكك" — الشاشة الختامية للعمرة (Figma 256:6451 — 393×852)
+//   subtitle: TawafTextBox(130, 117, 244)
+//   headline "الحمدلله على تمام النعمة": 15,179 — 359×38 (بالنص)
+//   sub-headline: 17,233 — 360×22 (بالنص)
+//   الرسمة: 31,271 — 307×199 (assets/images/saee/complete.png — لحد ما تنضاف بتطلع أيقونة)
+//   الدعاء: 17,494 — 360×110 (فقرة وحدة بالنص)
+//   الزر: 17,636 — 361×50
 // -------------------------------------------------------------
 class SaeeCompleteScreen extends StatelessWidget {
   final VoidCallback onFinish;
@@ -28,62 +24,52 @@ class SaeeCompleteScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return TawafPage(
       title: SaeeStepsText.completeTitle(),
-      frameHeight: 960,
       body: (c) => [
-        TawafParts.subtitle(c, SaeeStepsText.completeSubtitle(), const TawafTextBox(21, 117, 353)),
+        TawafParts.subtitle(c, SaeeStepsText.completeSubtitle(), const TawafTextBox(130, 117, 244)),
 
-        // headline
         c.text(
           SaeeStepsText.completeHeadline(),
-          left: 16,
-          top: 171,
-          width: 244,
-          height: 22,
-          dy: 0,
-          style: c.style(16, FigmaWeight.sfBold, TawafColors.green, lineHeight: null, letterSpacing: 0),
-        ),
-
-        // sub-headline
-        c.text(
-          SaeeStepsText.completeSubHeadline(),
-          left: 17,
-          top: 203,
+          left: 15,
+          top: 179,
           width: 359,
           height: 38,
           dy: 0,
           align: TextAlign.center,
-          style: c.style(16, FigmaWeight.semiBold, TawafColors.accent, lineHeight: 1.5, letterSpacing: 0),
+          style: c.style(24, FigmaWeight.sfBold, TawafColors.green, lineHeight: null, letterSpacing: 0),
         ),
 
-        // illustration — [GAP: assets/images/saee/complete.png]
+        c.text(
+          SaeeStepsText.completeSubHeadline(),
+          left: 17,
+          top: 233,
+          width: 360,
+          height: 22,
+          dy: 0,
+          align: TextAlign.center,
+          style: c.style(14, FigmaWeight.semiBold, TawafColors.accent, lineHeight: null, letterSpacing: 0),
+        ),
+
         c.rect(
-          left: 131,
-          top: 255,
-          width: 130,
-          height: 130,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(c.s.x(12)),
-            child: Image.asset(
-              'assets/images/saee/complete.png',
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Container(
-                color: TawafColors.card,
-                child: Center(child: Icon(Icons.mosque_rounded, color: TawafColors.accent, size: c.s.x(54))),
-              ),
-            ),
+          left: 31,
+          top: 271,
+          width: 307,
+          height: 199,
+          child: Image.asset(
+            'assets/images/saee/complete.png',
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => Center(child: Icon(Icons.mosque_rounded, color: TawafColors.accent, size: c.s.x(72))),
           ),
         ),
 
-        // دعاء الختام
         TawafParts.centered(
           c,
           SaeeStepsText.completeDua(),
-          const TawafTextBox(43, 399, 307),
-          c.style(14, FigmaWeight.sfRegular, TawafColors.green, lineHeight: 1.6, letterSpacing: 0),
-          maxHeight: 220,
+          const TawafTextBox(17, 494, 360),
+          c.style(13, FigmaWeight.sfRegular, TawafColors.green, lineHeight: 22, letterSpacing: 0),
+          maxHeight: 130,
         ),
 
-        TawafParts.button(c, const Rect.fromLTWH(17, 634, 361, 50), SaeeStepsText.completeButton(), onFinish),
+        TawafParts.button(c, const Rect.fromLTWH(17, 636, 361, 50), SaeeStepsText.completeButton(), onFinish),
       ],
     );
   }
