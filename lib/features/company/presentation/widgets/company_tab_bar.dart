@@ -9,6 +9,13 @@ import 'company_colors.dart';
 /// تبويبات الشركة بالترتيب من البداية (يمين بالعربي)
 enum CompanyTab { home, trips, groups, profile }
 
+/// الشل بيوفّره لشاشاته: أي كرت (مثلاً أرقام الرئيسية) بيقدر ينقل لتبويب
+class CompanyTabSwitch {
+  final ValueChanged<CompanyTab> select;
+
+  const CompanyTabSwitch(this.select);
+}
+
 // -------------------------------------------------------------
 // "نافبار الشركة" (395×70 من y765 بإطارات الشركة): #F5F5F5 94% + خط علوي 0.5 أسود 30%
 // التبويب المختار أيقونته مليانة (الرئيسية / الرحلات) ونصه أتقل

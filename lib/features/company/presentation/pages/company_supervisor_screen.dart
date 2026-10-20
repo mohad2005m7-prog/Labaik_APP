@@ -13,13 +13,15 @@ import '../../domain/entities/company_group.dart';
 import '../../domain/entities/company_member.dart';
 import '../../domain/repositories/company_repository.dart';
 import '../controllers/company_controller.dart';
+import '../l10n/company_forms_text.dart';
+import '../l10n/company_groups_text.dart';
 import '../l10n/company_profile_text.dart';
 import '../widgets/company_box.dart';
 import '../widgets/company_colors.dart';
 
 // -------------------------------------------------------------
 // "بيانات المشرف" — التحكم بمشرف من الشركة (مش بـ Figma — بستايل شاشات الشركة):
-//   الصورة والاسم وحالة الحساب ← البريد (نسخ) والهاتف (اتصال) ← مجموعاته
+//   الصورة والاسم وحالة الحساب ← البريد (نسخ) والهاتف (اتصال) ← مجموعاته (الضغط بيفتح تفاصيل المجموعة)
 //   ← التحكم: كلمة مرور مؤقتة جديدة / إيقاف أو تفعيل الحساب / حذف من الشركة (بتأكيد)
 // العمليات لسا مش بالسيرفر (ملف إبراهيم) — لحد ما تنضاف بتطلع رسالة واضحة بدل ما تفشل بصمت
 // بترجع true للي فتحها لو تغيّر إشي (حذف أو إيقاف)
@@ -43,12 +45,54 @@ class _CompanySupervisorScreenState extends State<CompanySupervisorScreen> {
   @override
   void initState() {
     super.initState();
+    _loadGroups();
+  }
+
+  void _loadGroups() {
     widget.repository.groups().then((all) {
       if (mounted) setState(() => _groups = [for (final g in all) if (g.supervisorName == _s.name) g]);
     }, onError: (_) {
       if (mounted) setState(() => _groups = const []);
     });
   }
+
+  /// "المجموعات" → تفاصيل مجموعته (ولو أكتر من وحدة بنختار من قائمة)
+  Future<void> _openGroups() async {
+    final groups = _groups ?? const <CompanyGroup>[];
+    if (groups.isEmpty) return;
+    final group = groups.length == 1 ? groups.first : await _pickGroup(groups);
+    if (group == null || !mounted) return;
+    if (await CompanyController.openGroupFrom(context, widget.repository, group) && mounted) {
+      _changed = true;
+      _loadGroups();
+    }
+  }
+
+  Future<CompanyGroup?> _pickGroup(List<CompanyGroup> groups) => showModalBottomSheet<CompanyGroup>(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(CompanyFormsText.chooseGroup(), style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 16, fontWeight: FontWeight.bold, color: CompanyColors.green)),
+              ),
+              for (final g in groups)
+                ListTile(
+                  leading: Image.asset('$companyAssets/ic_groups.png', width: 24, height: 24, color: CompanyColors.green),
+                  title: Text(g.name, style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 15, color: CompanyColors.green)),
+                  subtitle: Text(CompanyGroupsText.pilgrimCount(g.memberCount, hajj: g.hajj), style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 12)),
+                  trailing: const Icon(Icons.chevron_left_rounded, color: CompanyColors.green),
+                  onTap: () => Navigator.pop(ctx, g),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
 
   void _fail(Object e, {String? conflict}) {
     if (!mounted) return;
@@ -152,7 +196,7 @@ class _CompanySupervisorScreenState extends State<CompanySupervisorScreen> {
             CompanyController.showMessage(context, _s.email);
           }),
           ..._info(c, CompanyProfileText.phoneLabel(), _s.phone ?? '—', top: 360, ltr: true, onTap: _s.phone == null ? null : () => AppLauncher.call(_s.phone!)),
-          ..._info(c, CompanyProfileText.groupsLabel(), groupsText, top: 420),
+          ..._info(c, CompanyProfileText.groupsLabel(), groupsText, top: 420, onTap: (groups ?? const []).isEmpty ? null : _openGroups),
 
           // التحكم
           FigmaLines.build(c, CompanyProfileText.actions(), left: 177, top: 494, width: 200, style: c.style(16, FigmaWeight.semiBold, green), wrap: false),

@@ -68,4 +68,12 @@ abstract final class CompanyFormsText {
   static const healthNotes = Tx('ملاحظات صحية', 'Health notes');
   static const notes = Tx('ملاحظات', 'Notes');
   static const attendance = Tx('الحضور', 'Attendance');
+
+  // كل الحجاج والمعتمرين (كرت "حجاج / معتمرين" بالرئيسية)
+  static const pilgrimsTitle = Tx('الحجاج والمعتمرون', 'Pilgrims');
+  static const searchPilgrims = Tx('بحث بالاسم أو الإيميل', 'Search by name or email');
+  static const noPilgrims = Tx('لا يوجد حجاج أو معتمرون بعد', 'No pilgrims yet');
+  static String pilgrimsCount(int n) => tr('العدد: $n', 'Total: $n');
+  static const supervisorNotFound = Tx('هذا المشرف غير موجود في قائمة مشرفي الشركة', 'This supervisor is not on the company roster');
+  static const chooseGroup = Tx('اختر المجموعة', 'Choose a group');
 }

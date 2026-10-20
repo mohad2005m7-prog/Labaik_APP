@@ -25,8 +25,11 @@ import 'package:labaik/features/company/presentation/pages/company_supervisors_s
 import 'package:labaik/features/company/presentation/pages/company_create_group_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_data_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_notifications_screen.dart';
+import 'package:labaik/features/company/presentation/pages/company_pilgrims_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_shell.dart';
+import 'package:labaik/features/company/presentation/pages/company_trip_details_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_trips_screen.dart';
+import 'package:labaik/features/supervisor/presentation/pages/member_details_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // -------------------------------------------------------------
@@ -453,5 +456,94 @@ void main() {
     expect(find.byType(CompanySupervisorScreen), findsNothing);
     expect(repo.removedSupervisors, hasLength(1));
     expect(text('سندس جوادة'), findsNothing);
+  });
+
+  testWidgets('home is interactive: stat cards, active trips, pilgrims → profile, supervisor name → supervisor page', (tester) async {
+    tester.view.physicalSize = const Size(393 * 3, 852 * 3);
+    tester.view.devicePixelRatio = 3;
+    tester.view.padding = const FakeViewPadding(top: 59 * 3, bottom: 34 * 3);
+    tester.view.viewPadding = const FakeViewPadding(top: 59 * 3, bottom: 34 * 3);
+    addTearDown(tester.view.reset);
+    final repo = FakeCompany();
+    await repo.addSupervisor(fullName: 'عمر حداد', email: 'omar@x.com');
+    repo.groupsList.add(const CompanyGroup(id: 'g1', tripId: '1', name: 'مجموعة النور', tripName: 'رحلة العمرة الأولى', joinCode: 'K7P2QX', memberCount: 1, status: CompanyGroupStatus.active, supervisorName: 'عمر حداد'));
+    repo.membersList.add(const CompanyMember(userId: 'p1', name: 'أحمد علي', number: 15, present: true));
+    await tester.pumpWidget(MaterialApp(
+      builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+      home: CompanyShell(repository: repo),
+    ));
+    await tester.pumpAndSettle();
+    Finder text(String v) => find.text(v, findRichText: true);
+
+    // الرحلات النشطة الحقيقية تحت كروت الإجراءات
+    expect(text('رحلة العمرة الأولى'), findsOneWidget);
+    expect(text('رحلة الحج الثالثة'), findsOneWidget);
+
+    // "حجاج / معتمرين" → كل المعتمرين (بلا المشرف) → صفحة المعتمر
+    await tester.tap(text('حجاج / معتمرين'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanyPilgrimsScreen), findsOneWidget);
+    expect(text('العدد: 1'), findsOneWidget);
+    expect(text('مجموعة النور'), findsOneWidget);
+    expect(text('عمر حداد'), findsNothing);
+    await tester.tap(text('أحمد علي'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(MemberDetailsScreen), findsOneWidget);
+    Navigator.of(tester.element(find.byType(MemberDetailsScreen))).pop();
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(CompanyPilgrimsScreen))).pop();
+    await tester.pumpAndSettle();
+
+    // "المشرفون" → إدارة المشرفين
+    await tester.tap(text('المشرفون'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanySupervisorsScreen), findsOneWidget);
+    Navigator.of(tester.element(find.byType(CompanySupervisorsScreen))).pop();
+    await tester.pumpAndSettle();
+
+    // كرت رحلة نشطة → تفاصيلها → اسم المشرف بالمجموعة → صفحة المشرف (ومجموعاته بتفتح التفاصيل)
+    await tester.ensureVisible(text('عرض تفاصيل الرحلة').first);
+    await tester.pumpAndSettle();
+    await tester.tap(text('عرض تفاصيل الرحلة').first);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanyTripDetailsScreen), findsOneWidget);
+    await tester.tap(text('عرض تفاصيل المجموعة'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanyGroupDetailScreen), findsOneWidget);
+    await tester.tap(text('مشرف المجموعة : عمر حداد'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanySupervisorScreen), findsOneWidget);
+    expect(text('مجموعة النور'), findsOneWidget);
+    await tester.tap(text('مجموعة النور'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanyGroupDetailScreen, skipOffstage: false), findsNWidgets(2));
+    Navigator.of(tester.element(find.byType(CompanyGroupDetailScreen))).pop();
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(CompanySupervisorScreen))).pop();
+    await tester.pumpAndSettle();
+
+    // أعضاء المجموعة: الضغط على المشرف → صفحة المشرف مش صفحة المعتمر
+    await tester.tap(text('عرض جميع الاعضاء'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(text('عمر حداد'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanySupervisorScreen), findsOneWidget);
+    expect(find.byType(MemberDetailsScreen), findsNothing);
+    Navigator.of(tester.element(find.byType(CompanySupervisorScreen))).pop();
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(CompanyMembersScreen))).pop();
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(CompanyGroupDetailScreen))).pop();
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.byType(CompanyTripDetailsScreen))).pop();
+    await tester.pumpAndSettle();
+
+    // "الرحلات النشطة" (الكرت) → تبويب الرحلات
+    await tester.ensureVisible(text('الرحلات النشطة').first);
+    await tester.pumpAndSettle();
+    await tester.tap(text('الرحلات النشطة').first, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanyTripsScreen), findsOneWidget);
+    expect(text('جميع الرحلات'), findsOneWidget);
   });
 }

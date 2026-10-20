@@ -22,7 +22,7 @@ import '../widgets/company_search_field.dart';
 // -------------------------------------------------------------
 // "أعضاء المجموعة" — مطابقة لـ Figma 755:4070 (والحذف) / 630:3841 (زر الإضافة تحت)
 // البحث ← صفوف كل 53 من y177: الصورة 45 يمين، الاسم (SF Compact Bold 16 #717171 طرفه x316)، والسهم ‹ يسار
-// الضغط → صفحة العضو | الضغط المطوّل على معتمر → "حذف من المجموعة" (DELETE .../members/{id})
+// الضغط → صفحة العضو (والمشرف → صفحة المشرف) | الضغط المطوّل على معتمر → "حذف من المجموعة" (DELETE .../members/{id})
 // "إضافة عضو" → بالإيميل (POST .../members) — بترجع عدد المعتمرين الجديد لو تغيّر
 // -------------------------------------------------------------
 class CompanyMembersScreen extends StatefulWidget {
@@ -99,6 +99,13 @@ class _CompanyMembersScreenState extends State<CompanyMembersScreen> {
     }
   }
 
+  Future<void> _openSupervisor(CompanyMember m) async {
+    if (await CompanyController.openSupervisor(context, widget.repository, userId: m.userId, name: m.name) && mounted) {
+      _changed = true;
+      _load();
+    }
+  }
+
   List<CompanyMember> get _visible {
     final q = _query.trim().toLowerCase();
     final all = _members ?? const [];
@@ -152,7 +159,7 @@ class _CompanyMembersScreenState extends State<CompanyMembersScreen> {
           height: _rowPitch,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => CompanyController.openMemberPage(context, widget.repository, groupId: widget.group.id, member: m),
+            onTap: () => m.isSupervisor ? _openSupervisor(m) : CompanyController.openMemberPage(context, widget.repository, groupId: widget.group.id, member: m),
             onLongPress: m.isSupervisor ? null : () => setState(() => _removing = m.userId),
           ),
         ),

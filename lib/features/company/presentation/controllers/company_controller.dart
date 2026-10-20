@@ -34,9 +34,12 @@ import '../pages/company_group_detail_screen.dart';
 import '../pages/company_help_screen.dart';
 import '../pages/company_members_screen.dart';
 import '../pages/company_notifications_screen.dart';
+import '../pages/company_pilgrims_screen.dart';
 import '../pages/company_settings_screen.dart';
+import '../pages/company_supervisor_screen.dart';
 import '../pages/company_supervisors_screen.dart';
 import '../pages/company_trip_details_screen.dart';
+import '../widgets/company_tab_bar.dart';
 
 // -------------------------------------------------------------
 // التنقل بواجهة الشركة (كل الشاشات المدفوعة من هنا) — والتحديث بعد أي تعديل
@@ -61,6 +64,12 @@ abstract final class CompanyController {
     context.read<CompanyTripsCubit>().load();
     context.read<CompanyGroupsCubit>().load();
     context.read<CompanyProfileCubit>().load();
+  }
+
+  /// كروت الرئيسية: "الرحلات النشطة" → تبويب الرحلات (الكل)، "المجموعات" → تبويب المجموعات
+  static void openTab(BuildContext context, CompanyTab tab) {
+    if (tab == CompanyTab.trips) context.read<CompanyTripsCubit>().select(CompanyTripsFilter.all);
+    context.read<CompanyTabSwitch>().select(tab);
   }
 
   static Future<void> openNotifications(BuildContext context) {
@@ -120,6 +129,41 @@ abstract final class CompanyController {
     final changed = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyGroupDetailScreen(group: group, repository: repo, trip: trip))) ?? false;
     if (changed && refresh && context.mounted) refreshAll(context);
     return changed;
+  }
+
+  /// تفاصيل مجموعة من أي شاشة (صفحة المشرف مثلاً) — بنجيب رحلتها حتى يطلع تاريخها
+  static Future<bool> openGroupFrom(BuildContext context, CompanyRepository repo, CompanyGroup group) async {
+    CompanyTrip? trip;
+    try {
+      trip = (await repo.trips()).where((t) => t.id == group.tripId).firstOrNull;
+    } catch (_) {
+      // بلا تاريخ الرحلة
+    }
+    if (!context.mounted) return false;
+    return await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyGroupDetailScreen(group: group, repository: repo, trip: trip))) ?? false;
+  }
+
+  /// "حجاج / معتمرين" → كل الحجاج والمعتمرين بمجموعات الشركة ([trip] = رحلة وحدة بس)
+  static Future<bool> openPilgrims(BuildContext context, CompanyRepository repo, {CompanyTrip? trip}) async =>
+      await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyPilgrimsScreen(repository: repo, trip: trip))) ?? false;
+
+  /// صفحة مشرف (من اسمه بكرت المجموعة أو من قائمة الأعضاء) — بترجع true لو تغيّر (إيقاف أو حذف)
+  static Future<bool> openSupervisor(BuildContext context, CompanyRepository repo, {String? userId, String? name}) async {
+    CompanySupervisor? found;
+    try {
+      final roster = await repo.supervisors();
+      found = roster.where((s) => s.userId == userId).firstOrNull ?? roster.where((s) => name != null && s.name == name).firstOrNull;
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+      return false;
+    }
+    if (!context.mounted) return false;
+    if (found == null) {
+      showMessage(context, CompanyFormsText.supervisorNotFound());
+      return false;
+    }
+    final supervisor = found;
+    return await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanySupervisorScreen(supervisor: supervisor, repository: repo))) ?? false;
   }
 
   /// أعضاء المجموعة — بترجع عدد المعتمرين الجديد لو تغيّر (إضافة أو حذف)، وإلا null

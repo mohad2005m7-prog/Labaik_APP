@@ -18,6 +18,7 @@ import '../widgets/company_group_card.dart';
 // -------------------------------------------------------------
 // "تفاصيل المجموعة" — مطابقة لـ Figma 630:4039 (فيها مشرف) / 748:3815 (بلا مشرف ولا أعضاء)
 // كرت المجموعة 120 ← "تاريخ الرحلة" و"المعتمرون" ← "عرض جميع الاعضاء" (أو "إضافة اعضاء مجموعة")
+// (اسم المشرف بالكرت بيفتح صفحته)
 // ← "رؤية الدردشة" و"تغيير المشرف" (السهم بيفتح قائمة مشرفي الشركة تحته — Group 82) ← "ملاحظات إضافية"
 // تحتهم رمز الانضمام اللي بيدخله المعتمر (مش بـ Figma — اضغط للنسخ)
 // بترجع true للي فتحها لو تغيّر إشي حتى يحدّث القوائم والأرقام
@@ -89,6 +90,10 @@ class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
     if (added != null && mounted) await _assign(added);
   }
 
+  Future<void> _openSupervisor() async {
+    if (await CompanyController.openSupervisor(context, widget.repository, name: _group.supervisorName) && mounted) _changed = true;
+  }
+
   void _copyCode() {
     if (_group.joinCode.isEmpty) return;
     Clipboard.setData(ClipboardData(text: _group.joinCode));
@@ -113,6 +118,8 @@ class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
         chevronLeft: 367,
         body: (c) => [
           ...CompanyGroupCard.build(c, group, top: 125, withLink: false),
+          // "مشرف المجموعة : ..." → صفحة المشرف (التحكم فيه)
+          if (hasSupervisor) c.tapArea(left: 120, top: 125 + 62, width: 196, height: 30, onTap: _openSupervisor),
 
           // تاريخ الرحلة / المعتمرون
           ..._stat(c, left: 206, icon: 'ic_create_trip', iconLeft: 336, label: CompanyGroupsText.tripDate(), labelRight: 322, value: date == null ? '—' : '${date.day}/${date.month}/${date.year}', valueRight: 328),

@@ -35,6 +35,8 @@ class _CompanyShellState extends State<CompanyShell> {
   late final _groups = CompanyGroupsCubit(_repository)..load();
   late final _profile = CompanyProfileCubit(_repository)..load();
 
+  late final _tabSwitch = CompanyTabSwitch(_select);
+
   var _tab = CompanyTab.home;
   final _built = <CompanyTab>{CompanyTab.home};
 
@@ -84,8 +86,8 @@ class _CompanyShellState extends State<CompanyShell> {
   @override
   Widget build(BuildContext context) {
     final c = FigmaCanvas(DesignScale.of(context));
-    return RepositoryProvider.value(
-      value: _repository,
+    return MultiRepositoryProvider(
+      providers: [RepositoryProvider.value(value: _repository), RepositoryProvider.value(value: _tabSwitch)],
       child: MultiBlocProvider(
         providers: [BlocProvider.value(value: _home), BlocProvider.value(value: _trips), BlocProvider.value(value: _groups), BlocProvider.value(value: _profile)],
         child: Scaffold(

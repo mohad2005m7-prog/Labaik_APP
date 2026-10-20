@@ -10,6 +10,7 @@ import '../../domain/entities/company_group.dart';
 import '../../domain/entities/company_member.dart';
 import '../../domain/entities/company_trip.dart';
 import '../../domain/repositories/company_repository.dart';
+import '../controllers/company_controller.dart';
 import '../l10n/company_forms_text.dart';
 import '../l10n/company_groups_text.dart';
 import '../l10n/company_trips_text.dart';
@@ -18,10 +19,12 @@ import '../widgets/company_colors.dart';
 import '../widgets/company_group_card.dart';
 import 'company_create_group_screen.dart';
 import 'company_group_detail_screen.dart';
+import 'company_supervisors_screen.dart';
 
 // -------------------------------------------------------------
 // "تفاصيل الرحلة" — مطابقة لـ Figma 738:4590 (إطار 1039 بيتمرر)
 // كرت الرحلة (الاسم، الوجهات، الشارة، والتاريخ تحت الخط) ← 3 أرقام (مجموعات / معتمر / المشرفين)
+// (الضغط على "معتمر" بيفتح حجاجها/معتمريها، وعلى "المشرفين" إدارة المشرفين)
 // ← "توزيع المجموعة" وكروت مجموعات الرحلة (كل 174) ← "إنشاء مجموعة" لهالرحلة
 // بترجع true للي فتحها لو انعملت مجموعة أو تغيّرت وحدة
 // -------------------------------------------------------------
@@ -76,6 +79,21 @@ class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
     }
   }
 
+  Future<void> _openPilgrims() async {
+    if (await CompanyController.openPilgrims(context, widget.repository, trip: widget.trip) && mounted) {
+      _changed = true;
+      _load();
+    }
+  }
+
+  Future<void> _openSupervisors() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => CompanySupervisorsScreen(repository: widget.repository)));
+    if (!mounted) return;
+    // ممكن انوقف أو انحذف مشرف — منحدّث المجموعات والأرقام
+    _changed = true;
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final trip = widget.trip;
@@ -108,9 +126,10 @@ class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
           FigmaLines.build(c, trip.dates, left: 100, top: 243, width: 239, style: c.style(12, FigmaWeight.sfRegular, green), wrap: false),
 
           // الأرقام
+          // "معتمر" → حجاج/معتمرين هالرحلة، "المشرفين" → إدارة المشرفين
           ..._stat(c, left: 277, value: groups.length, label: CompanyTripsText.groupsStat()),
-          ..._stat(c, left: 149, value: pilgrims, label: CompanyTripsText.pilgrimsStat(hajj: trip.isHajj)),
-          ..._stat(c, left: 22, value: supervisors, label: CompanyTripsText.supervisorsStat()),
+          ..._stat(c, left: 149, value: pilgrims, label: CompanyTripsText.pilgrimsStat(hajj: trip.isHajj), onTap: _openPilgrims),
+          ..._stat(c, left: 22, value: supervisors, label: CompanyTripsText.supervisorsStat(), onTap: _openSupervisors),
 
           FigmaLines.build(c, CompanyTripsText.distribution(), left: 177, top: 395, width: 200, style: c.style(20, FigmaWeight.sfBold, green, lineHeight: 24), lineHeight: 24, wrap: false),
           if (_groups == null && !_failed) c.rect(left: 176, top: _groupsTop + 10, width: 40, height: 40, child: CircularProgressIndicator(strokeWidth: 2.4, color: green)),
@@ -128,9 +147,10 @@ class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
   }
 
   // كرت رقم 100×80 (#4C7A75 10%): الرقم فوق (y307) والعنوان تحته (y339) بالنص
-  List<Widget> _stat(FigmaCanvas c, {required double left, required int value, required String label}) => [
+  List<Widget> _stat(FigmaCanvas c, {required double left, required int value, required String label, VoidCallback? onTap}) => [
         companyBox(c, left: left, top: 291, width: 100, height: 80, radius: 10, color: CompanyColors.card, shadow: CompanyColors.shadow),
         FigmaLines.build(c, '$value', left: left, top: 307, width: 100, align: TextAlign.center, style: c.style(20, FigmaWeight.sfBold, CompanyColors.green, lineHeight: 24), lineHeight: 24, wrap: false),
         FigmaLines.build(c, label, left: left, top: 339, width: 100, align: TextAlign.center, style: c.style(14, FigmaWeight.sfRegular, CompanyColors.green, lineHeight: 17), lineHeight: 17, wrap: false),
+        if (onTap != null) c.tapArea(left: left, top: 291, width: 100, height: 80, onTap: onTap),
       ];
 }
