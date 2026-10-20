@@ -231,6 +231,32 @@ void main() {
     expect(text('الاستعداد للعمرة'), findsOneWidget);
   });
 
+  test('supervisor adds a pilgrim by email (trimmed, empty fields left out) and removes one; the cubit reloads / drops the row', () async {
+    final members = [
+      {'userId': 'lead', 'fullName': 'المشرف', 'role': 1},
+      {'userId': 'u1', 'fullName': 'أحمد محمد', 'role': 2, 'memberNumber': 1},
+    ];
+    final s = FakeServer({
+      'GET /groups/g1/members': (_) => members,
+      'POST /groups/g1/members': (r) {
+        final body = jsonDecode(r.body) as Map<String, dynamic>;
+        members.add({'userId': 'u2', 'fullName': body['fullName'] ?? body['email'], 'role': 2, 'memberNumber': 2});
+        return {'id': 'g1', 'name': 'المجموعة الأولى', 'pilgrimCount': 2};
+      },
+      'DELETE /groups/g1/members/u1': (_) => null,
+    });
+    final cubit = GroupMembersCubit(repository(s), 'g1');
+    await cubit.load();
+    expect(cubit.state.items.map((m) => m.name), ['أحمد محمد']);
+    await cubit.add(email: ' new@x.com ', fullName: 'سارة', phone: '  ');
+    expect(jsonDecode(s.requests.firstWhere((r) => r.method == 'POST').body), {'email': 'new@x.com', 'fullName': 'سارة'});
+    expect(cubit.state.items.map((m) => m.name), ['أحمد محمد', 'سارة']);
+    await cubit.remove(cubit.state.items.first);
+    expect(s.requests.any((r) => r.method == 'DELETE' && r.url.path.endsWith('/groups/g1/members/u1')), isTrue);
+    expect(cubit.state.items.map((m) => m.name), ['سارة']);
+    await cubit.close();
+  });
+
   test('notification sections: unknown types are ignored, older days use the date', () {
     final now = DateTime(2026, 10, 16, 12);
     final sections = NotificationSections.fromJson([

@@ -16,8 +16,12 @@ abstract final class GroupJoinText {
   static String supervisor(String name) => tr('المشرف :$name', 'Supervisor: $name');
   static String members(int n) => tr('عدد أفراد المجموعة: $n معتمرًا', 'Group members: $n pilgrims');
   static const noSupervisor = Tx('المشرف :لم يُحدَّد بعد', 'Supervisor: not assigned yet');
+  static String tripDate(DateTime d) => tr('تاريخ الرحلة: ${d.day} ${_ar[d.month - 1]} ${d.year}', 'Trip date: ${d.day} ${_en[d.month - 1]} ${d.year}');
+  static const _ar = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  static const _en = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   static const wrongCode = Tx('رمز المجموعة غير صحيح', 'Wrong group code');
+  // سيرفر أقدم (قبل 20 أكتوبر كان الانضمام بالرمز للأدمن بس)
   static const joinClosed = Tx('الانضمام بالرمز غير متاح حالياً، شركتك هي اللي بتضيفك للمجموعة', 'Joining by code is not available yet; your company adds you to the group');
   static const connectionError = Tx('تعذّر الاتصال، حاول مرة أخرى', 'Connection failed, please try again');
 

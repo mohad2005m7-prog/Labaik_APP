@@ -16,6 +16,8 @@ import 'package:labaik/features/chats/data/repositories/group_chat_repository.da
 import 'package:labaik/features/chats/data/sources/group_chat_api.dart';
 import 'package:labaik/features/family/domain/entities/family_member.dart';
 import 'package:labaik/features/group/data/sources/group_api.dart';
+import 'package:labaik/features/group/domain/entities/group_preview.dart';
+import 'package:labaik/features/group/presentation/l10n/group_join_text.dart';
 import 'package:labaik/features/group/data/sources/group_realtime.dart';
 import 'package:labaik/features/group/data/sources/location_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -214,6 +216,14 @@ void main() {
     await AccountRegistry.signedIn('a@example.com');
     expect((await AccountRegistry.current())?.type, AccountType.groupSupervisor);
   });
+
+  test('group preview: trip date and company name from GroupSummaryDto (older server: none)', () {
+    final p = GroupPreview.fromJson({'id': 'g1', 'name': 'حملة النور', 'leaderName': ' ', 'memberCount': 4, 'tripDate': '2026-11-20', 'companyName': 'شركة النور'}, 'K7P2QX');
+    expect((p.supervisor, p.tripDate, p.companyName), (null, DateTime(2026, 11, 20), 'شركة النور'));
+    expect(GroupJoinText.tripDate(p.tripDate!), 'تاريخ الرحلة: 20 نوفمبر 2026');
+    final old = GroupPreview.fromJson({'id': 'g1', 'name': 'x', 'memberCount': 1}, 'C');
+    expect((old.tripDate, old.companyName), (null, null));
+  });
 }
 
 /// hub وهمي: الأحداث من [stream]
@@ -227,4 +237,5 @@ class _FakeHub extends SignalRHub {
 
   @override
   bool get isConnected => true;
+
 }

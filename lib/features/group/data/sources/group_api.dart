@@ -38,8 +38,7 @@ class GroupApi {
     return GroupPreview.fromJson(data, code);
   }
 
-  /// الانضمام بالرمز: POST /groups/{code}/join
-  /// ⚠️ السيرفر حالياً بيسمح فيه للـ Admin بس — الحاج بياخد 403 (الشركة هي اللي بتضيف الأعضاء)
+  /// الانضمام بالرمز: POST /groups/{code}/join — لأي مستخدم داخل (من 20 أكتوبر؛ عضو أصلاً = 409 Group.AlreadyMember)
   Future<void> join(String code) => _client.postJson('/groups/${Uri.encodeComponent(code)}/join');
 
   Future<List<GroupMember>> members(String groupId) async {

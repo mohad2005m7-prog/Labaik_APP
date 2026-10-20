@@ -37,7 +37,8 @@ class GroupConfirmScreen extends StatelessWidget {
           c.text(group.name, left: 236.5, top: 173, width: 132, height: 22, align: TextAlign.center, style: c.style(16, FigmaWeight.semiBold, Colors.white, lineHeight: null, letterSpacing: 0)),
           c.text(group.supervisor == null ? GroupJoinText.noSupervisor() : GroupJoinText.supervisor(group.supervisor!), left: 30, top: 225, width: 329.5, height: 24, style: line),
           c.text(GroupJoinText.members(group.memberCount), left: 30, top: 262, width: 329.5, height: 24, style: line),
-          // تاريخ الرحلة (سطر 300) مش موجود برد السيرفر (GroupSummaryDto) — بيرجع لما يضيفه
+          // تاريخ الرحلة (سطر 300) — من tripDate بالرد (مجموعة بلا رحلة: ما بيطلع)
+          if (group.tripDate != null) c.text(GroupJoinText.tripDate(group.tripDate!), left: 30, top: 300, width: 329.5, height: 24, style: line),
           c.button(GroupJoinText.join(), left: 17, top: 377, figmaSpacing: true, onTap: () => GroupController.joinGroup(context, group)),
         ];
       },

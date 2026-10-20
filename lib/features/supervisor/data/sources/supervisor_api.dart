@@ -11,6 +11,8 @@ import '../../../auth/data/token_refresher.dart';
 //   GET /groups/{id}/members                    → GroupMemberRowDto[] (المشرف أول — بلا ملاحظات صحية)
 //   GET /groups/{id}/members/{userId}           → GroupMemberDetailsDto (مع healthNotes و notes)
 //   PUT /groups/{id}/attendance/{userId}        → { status: 1 حاضر | 2 غائب }
+//   POST /groups/{id}/members                   → إضافة معتمر بالإيميل { email, fullName?, phoneNumber? } (إيميل جديد = حساب بكلمة مؤقتة)
+//   DELETE /groups/{id}/members/{userId}        → إزالة معتمر (الشركة بيوصلها إشعار 13/14)
 // -------------------------------------------------------------
 class SupervisorApi {
   final ApiClient _client;
@@ -29,6 +31,10 @@ class SupervisorApi {
   Future<List<Map<String, dynamic>>> members(String groupId) async => _list(await _client.getJson('/groups/$groupId/members'));
 
   Future<Map<String, dynamic>> member(String groupId, String userId) async => _map(await _client.getJson('/groups/$groupId/members/$userId'));
+
+  Future<void> addMember(String groupId, Map<String, dynamic> body) => _client.postJson('/groups/$groupId/members', body: body);
+
+  Future<void> removeMember(String groupId, String userId) => _client.delete('/groups/$groupId/members/$userId');
 
   Future<void> setAttendance(String groupId, String userId, {required bool present}) => _client.putJson('/groups/$groupId/attendance/$userId', body: {'status': present ? 1 : 2});
 

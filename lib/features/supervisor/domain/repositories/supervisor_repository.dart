@@ -23,6 +23,10 @@ abstract class SupervisorRepository {
   /// بطاقة العضو كاملة (الملاحظات الصحية) — [member] من القائمة
   Future<GroupMember> getMember(String groupId, GroupMember member);
 
+  /// إضافة معتمر لمجموعتي بالإيميل (409 = موجود أصلاً) — وإزالته
+  Future<void> addMember(String groupId, {required String email, String? fullName, String? phone});
+  Future<void> removeMember(String groupId, String memberId);
+
   /// تسجيل حضور/غياب معتمر يدوياً
   Future<void> setAttendance(String groupId, String memberId, {required bool present});
   Future<List<NotificationSection>> getNotifications();

@@ -154,6 +154,16 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
   }
 
   @override
+  Future<void> addMember(String groupId, {required String email, String? fullName, String? phone}) => _supervisor.addMember(groupId, {
+        'email': email.trim(),
+        if (fullName != null && fullName.trim().isNotEmpty) 'fullName': fullName.trim(),
+        if (phone != null && phone.trim().isNotEmpty) 'phoneNumber': phone.trim(),
+      });
+
+  @override
+  Future<void> removeMember(String groupId, String memberId) => _supervisor.removeMember(groupId, memberId);
+
+  @override
   Future<void> setAttendance(String groupId, String memberId, {required bool present}) => _supervisor.setAttendance(groupId, memberId, present: present);
 
   @override

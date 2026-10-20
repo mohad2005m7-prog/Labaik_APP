@@ -92,6 +92,18 @@ class GroupMembersCubit extends _ListCubit<GroupMember> {
 
   @override
   Future<List<GroupMember>> fetch() => _repository.getMembers(groupId);
+
+  /// إضافة معتمر بالإيميل (بترمي الخطأ للشاشة) وبعدها القائمة بتتحدّث من السيرفر
+  Future<void> add({required String email, String? fullName, String? phone}) async {
+    await _repository.addMember(groupId, email: email, fullName: fullName, phone: phone);
+    await load();
+  }
+
+  /// إزالة معتمر — بيختفي فوراً من القائمة
+  Future<void> remove(GroupMember member) async {
+    await _repository.removeMember(groupId, member.id);
+    if (!isClosed) emit(state.copyWith(items: [for (final m in state.items) if (m.id != member.id) m]));
+  }
 }
 
 extension MembersFilter on ListState<GroupMember> {
