@@ -15,7 +15,7 @@ import '../widgets/company_stat_card.dart';
 
 // -------------------------------------------------------------
 // رئيسية الشركة — مطابقة لـ Figma "الشاشة الرئيسية للشركة" (455:2885)
-// الجرس → الإشعارات | الترحيب واسم الشركة | الصورة | 4 أرقام | "الرحلات النشطة" | إنشاء رحلة / إنشاء المجموعات
+// الجرس → الإشعارات | الترحيب باسم الشركة | الصورة | 4 أرقام | "الرحلات النشطة" | إنشاء رحلة / إنشاء المجموعات
 // -------------------------------------------------------------
 class CompanyHomeScreen extends StatelessWidget {
   const CompanyHomeScreen({super.key});
@@ -38,10 +38,8 @@ class CompanyHomeScreen extends StatelessWidget {
           // الجرس (Hicon) 24 من (16,59)
           c.image('$companyAssets/ic_bell.png', left: 16, top: 59, width: 24, height: 24),
           c.tapArea(left: 8, top: 51, width: 40, height: 40, onTap: () => CompanyController.openNotifications(context)),
-          // SF Compact 790 20 — طرفه x377
-          c.text(o.firstName.isEmpty ? CompanyHomeText.greeting() : CompanyHomeText.greetingName(o.firstName), left: 56, top: 59, width: 321, height: 24, style: c.style(20, FigmaWeight.sfBold, CompanyColors.green, lineHeight: null, letterSpacing: 0)),
-          // اسم الشركة — Poppins 400 15 (السيرفر لسا ما فيه بيانات الشركة: فاضي)
-          if (o.companyName != null) FigmaLines.build(c, o.companyName!, left: 56, top: 90, width: 321, style: c.style(15, FigmaWeight.poppinsRegular, CompanyColors.green), wrap: false),
+          // SF Compact 790 20 — طرفه x377: "السلام عليكم، <اسم الشركة>" (من /company/me — وإلا اسم صاحب الحساب)
+          c.text(o.greetingName.isEmpty ? CompanyHomeText.greeting() : CompanyHomeText.greetingName(o.greetingName), left: 56, top: 59, width: 321, height: 24, style: c.style(20, FigmaWeight.sfBold, CompanyColors.green, lineHeight: null, letterSpacing: 0)),
           c.image(heroAsset, left: 15, top: 135, width: 361, height: 244, radius: 10, fit: BoxFit.cover, cacheWidth: heroCacheWidth(context)),
           ...CompanyStatCard.build(c, _activeTrips, icon: 'ic_active_trips', label: CompanyHomeText.activeTrips(), value: o.activeTrips),
           ...CompanyStatCard.build(c, _pilgrims, icon: 'ic_pilgrims', label: CompanyHomeText.pilgrims(), value: o.pilgrims),

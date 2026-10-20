@@ -5,18 +5,32 @@ import '../../../../core/theme/figma_text.dart';
 import '../../../../core/utils/design_scale.dart';
 import '../../../../core/utils/figma_canvas.dart';
 import '../../../../core/widgets/figma_page.dart';
+import '../../../../core/l10n/api_error_text.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../supervisor/presentation/widgets/supervisor_format.dart';
+import '../../domain/entities/company_trip.dart';
+import '../../domain/repositories/company_repository.dart';
+import '../controllers/company_controller.dart';
 import '../l10n/company_create_trip_text.dart';
+import '../l10n/company_forms_text.dart';
 import '../widgets/company_colors.dart';
 
 // -------------------------------------------------------------
 // "إنشاء رحلة جديدة" — Figma 572:3961 (393×1046) → FigmaPage frameHeight 1046
 // الحقول: نوع الرحلة (dropdown) / الاسم / الوجهات / تاريخا الذهاب والعودة / العدد / الانطلاق / ملاحظات
 // بعد "إنشاء الرحلة" بيطلع بوب-أب "تم إنشاء الرحلة" (647:4722) 391×353
-// الباك-اند ما فيه دعم للشركة بعد — الشاشة UI فقط وبتتحدّث بعد ما يضيف الصديق الـ endpoints
+// "إنشاء الرحلة" → POST /company/trips — الوجهات مفصولة بفاصلة ("مكة المكرمة، المدينة المنورة")
+// بترجع true للي فتحها لما تنعمل الرحلة (حتى يحدّث الأرقام والقائمة)
 // -------------------------------------------------------------
 class CompanyCreateTripScreen extends StatefulWidget {
-  const CompanyCreateTripScreen({super.key});
+  final CompanyRepository repository;
+
+  const CompanyCreateTripScreen({super.key, required this.repository});
+
+  /// "مكة المكرمة، المدينة المنورة" أو بفاصلة إنجليزية → قائمة
+  static List<String> splitDestinations(String text) => [
+        for (final d in text.split(RegExp(r'[,،\n]'))) if (d.trim().isNotEmpty) d.trim(),
+      ];
 
   @override
   State<CompanyCreateTripScreen> createState() => _CompanyCreateTripScreenState();
@@ -31,6 +45,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
   final _pilgrims = TextEditingController();
   final _departurePoint = TextEditingController();
   final _notes = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -92,10 +107,39 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    if (_name.text.trim().isEmpty) return;
-    _showSuccess();
+    if (_busy) return;
+    final destinations = CompanyCreateTripScreen.splitDestinations(_destinations.text);
+    final count = int.tryParse(_pilgrims.text.trim()) ?? 0;
+    final departure = _departureDate;
+    if (_name.text.trim().isEmpty || destinations.isEmpty || departure == null || _departurePoint.text.trim().isEmpty || count <= 0) {
+      return CompanyController.showMessage(context, CompanyFormsText.tripMissing());
+    }
+    if (_returnDate != null && _returnDate!.isBefore(departure)) {
+      return CompanyController.showMessage(context, CompanyFormsText.returnBeforeDeparture());
+    }
+    setState(() => _busy = true);
+    try {
+      await widget.repository.createTrip(TripDraft(
+        kind: _tripTypeIndex == 1 ? PilgrimageKind.hajj : PilgrimageKind.umrah,
+        name: _name.text,
+        destinations: destinations,
+        departureDate: departure,
+        returnDate: _returnDate,
+        departurePlace: _departurePoint.text,
+        expectedPilgrims: count,
+        notes: _notes.text,
+      ));
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _showSuccess();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final message = e is ApiException && (e.statusCode == 400 || e.statusCode == 422) ? CompanyFormsText.invalidData() : ApiErrorText.of(e)();
+      CompanyController.showMessage(context, '${CompanyFormsText.tripCreateFailed()} — $message');
+    }
   }
 
   void _showSuccess() {
@@ -108,7 +152,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
       pageBuilder: (a, b, c2) => _TripCreatedDialog(
         onBack: () {
           Navigator.of(context).pop(); // dialog
-          Navigator.of(context).pop(); // form screen
+          Navigator.of(context).pop(true); // form screen — انعملت الرحلة
         },
       ),
     );
@@ -195,6 +239,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
           textField(_notes, CompanyCreateTripText.notesHint(), 864, multiline: true),
           // زر "إنشاء الرحلة"
           c.button(CompanyCreateTripText.createButton(), left: 16, top: 962, figmaSpacing: true, onTap: _submit),
+          if (_busy) c.rect(left: 16, top: 962, width: 361, height: 50, child: const _Busy()),
         ];
       },
     );
@@ -351,4 +396,16 @@ class _TripCreatedDialog extends StatelessWidget {
       ),
     );
   }
+}
+
+// ──── أثناء الإرسال: فوق الزر ────
+
+class _Busy extends StatelessWidget {
+  const _Busy();
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: BoxDecoration(color: CompanyColors.green, borderRadius: BorderRadius.circular(12)),
+        child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))),
+      );
 }

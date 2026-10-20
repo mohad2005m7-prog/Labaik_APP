@@ -1,27 +1,115 @@
 import '../../../auth/data/auth_session.dart';
 import '../../domain/entities/company_group.dart';
+import '../../domain/entities/company_member.dart';
 import '../../domain/entities/company_notification.dart';
 import '../../domain/entities/company_overview.dart';
 import '../../domain/entities/company_trip.dart';
 import '../../domain/repositories/company_repository.dart';
+import '../models/company_json.dart';
+import '../sources/company_api.dart';
 
 // -------------------------------------------------------------
-// واجهة الشركة: سيرفر لبيك لسا ما فيه حساب شركة ولا رحلاتها ولا مجموعاتها ولا إشعاراتها (docs/backend_pending.md)
-// فالموجود بس: اسم صاحب الحساب (من رد الدخول) — والباقي فاضي/0 لحد ما ينضافوا (ما في بيانات تجريبية)
+// واجهة الشركة من سيرفر لبيك (/company):
+// الرئيسية = /company/me (اسم الشركة) + /company/home (الأرقام)
+// الرحلات = /company/trips وتفاصيل كل رحلة (الوجهات) — المجموعات = مجموعات كل رحلة (ما في endpoint لكل المجموعات)
 // -------------------------------------------------------------
 class CompanyRepositoryImpl implements CompanyRepository {
+  CompanyRepositoryImpl({CompanyApi? api}) : _api = api ?? CompanyApi.server();
+
+  final CompanyApi _api;
+
   @override
   Future<CompanyOverview> overview() async {
     final name = (await AuthSession.current())?.fullName.trim() ?? '';
-    return CompanyOverview(firstName: name.isEmpty ? '' : name.split(RegExp(r'\s+')).first);
+    final firstName = name.isEmpty ? '' : name.split(RegExp(r'\s+')).first;
+    final (me, home) = (_api.me(), _api.home());
+    final company = await me;
+    final numbers = await home;
+    final companyName = company['name']?.toString().trim();
+    return CompanyOverview(
+      firstName: firstName,
+      companyName: companyName == null || companyName.isEmpty ? null : companyName,
+      activeTrips: _int(numbers['activeTrips']),
+      pilgrims: _int(numbers['pilgrimsCount']),
+      supervisors: _int(numbers['supervisorsCount']),
+      groups: _int(numbers['groupsCount']),
+    );
   }
 
   @override
-  Future<List<CompanyTrip>> trips() async => const [];
+  Future<List<CompanyTrip>> trips() async {
+    final summaries = await _api.trips();
+    // الملخص ما فيه وجهات — بنجيبها من تفاصيل كل رحلة بالتوازي (ولو فشلت وحدة بتنعرض بلا وجهات)
+    final destinations = await Future.wait([
+      for (final t in summaries) _api.trip(t['id'].toString()).then(CompanyJson.destinationsOf, onError: (_) => const <String>[]),
+    ]);
+    return [for (final (i, t) in summaries.indexed) CompanyJson.trip(t, destinations: destinations[i])];
+  }
 
   @override
-  Future<List<CompanyNotification>> notifications() async => const [];
+  Future<CompanyTrip> createTrip(TripDraft draft) async => CompanyJson.trip(await _api.createTrip(CompanyJson.tripBody(draft)));
 
   @override
-  Future<List<CompanyGroup>> groups() async => const [];
+  Future<List<CompanyNotification>> notifications() async => [for (final j in await _api.notifications()) ?CompanyJson.notification(j)];
+
+  @override
+  Future<List<CompanyGroup>> groups() async {
+    final trips = [for (final t in await _api.trips()) CompanyJson.trip(t)];
+    final perTrip = await Future.wait([for (final t in trips) _api.tripGroups(t.id)]);
+    final today = DateTime.now();
+    return [
+      for (final (i, list) in perTrip.indexed)
+        for (final g in list) CompanyJson.group(g, trip: trips[i], today: today),
+    ];
+  }
+
+  @override
+  Future<CompanyGroup> createGroup({required String tripId, required String name}) async {
+    final json = await _api.createGroup(tripId, name.trim());
+    return CompanyJson.group(json, trip: await _tripOf(tripId));
+  }
+
+  @override
+  Future<List<CompanyMember>> members(String groupId) async => [for (final j in await _api.members(groupId)) CompanyJson.member(j)];
+
+  @override
+  Future<CompanyMember> member(String groupId, String userId) async => CompanyJson.member(await _api.member(groupId, userId));
+
+  @override
+  Future<CompanyGroup> addMember(String groupId, {required String email, String? fullName, String? phone}) async {
+    final json = await _api.addMember(groupId, {
+      'email': email.trim(),
+      if (fullName != null && fullName.trim().isNotEmpty) 'fullName': fullName.trim(),
+      if (phone != null && phone.trim().isNotEmpty) 'phoneNumber': phone.trim(),
+    });
+    return CompanyJson.group(json, trip: await _tripOf(json['tripId']?.toString() ?? ''));
+  }
+
+  @override
+  Future<List<CompanySupervisor>> supervisors() async => [for (final j in await _api.supervisors()) CompanyJson.supervisor(j)];
+
+  @override
+  Future<CompanySupervisor> addSupervisor({required String fullName, required String email, String? phone}) async => CompanyJson.supervisor(await _api.addSupervisor({
+        'fullName': fullName.trim(),
+        'email': email.trim(),
+        if (phone != null && phone.trim().isNotEmpty) 'phoneNumber': phone.trim(),
+      }));
+
+  @override
+  Future<CompanyGroup> assignSupervisor(String groupId, String email) async {
+    final json = await _api.assignSupervisor(groupId, email.trim());
+    return CompanyJson.group(json, trip: await _tripOf(json['tripId']?.toString() ?? ''));
+  }
+
+  /// اسم الرحلة وحالتها للمجموعة (لو فشل الطلب بترجع بلا اسم رحلة)
+  Future<CompanyTrip?> _tripOf(String tripId) async {
+    if (tripId.isEmpty) return null;
+    try {
+      return CompanyJson.trip(await _api.trip(tripId));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static int _int(Object? v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
 }

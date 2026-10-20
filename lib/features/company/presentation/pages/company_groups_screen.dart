@@ -18,7 +18,7 @@ import '../widgets/company_tab_bar.dart';
 
 // -------------------------------------------------------------
 // تبويب "المجموعات" — Figma المجموعات (393×852) / المجموعات2 (393×977)
-// فارغة: زر "إنشاء مجموعة" وسط الشاشة
+// فارغة: زر "إنشاء مجموعة" وسط الشاشة (بيختار الرحلة ويكتب الاسم ← رمز الانضمام)
 // مليانة (977px تتمرر): بحث + فلاتر + كروت المجموعات + زر ثابت
 // -------------------------------------------------------------
 class CompanyGroupsScreen extends StatelessWidget {
@@ -34,12 +34,12 @@ class CompanyGroupsScreen extends StatelessWidget {
     final cubit = context.read<CompanyGroupsCubit>();
     return BlocBuilder<CompanyGroupsCubit, CompanyGroupsState>(
       builder: (context, state) {
-        if (!state.loaded || (state.groups.isEmpty && state.loaded)) {
+        if (state.groups.isEmpty) {
           // حالة فارغة
           return CompanyPage(
             inShell: true,
             builder: (c) => [
-              c.button(CompanyGroupsText.createGroup(), left: 16, top: 529, figmaSpacing: true, onTap: () => CompanyController.comingSoon(context)),
+              c.button(CompanyGroupsText.createGroup(), left: 16, top: 529, figmaSpacing: true, onTap: () => CompanyController.createGroups(context)),
             ],
           );
         }
@@ -77,7 +77,7 @@ class CompanyGroupsScreen extends StatelessWidget {
             for (final (i, group) in groups.indexed) ..._groupCard(c, context, group, top: _cardsTop + i * _cardPitch),
           ],
           fixed: (c) => [
-            c.button(CompanyGroupsText.createGroup(), left: 16, top: _buttonTop, figmaSpacing: true, onTap: () => CompanyController.comingSoon(context)),
+            c.button(CompanyGroupsText.createGroup(), left: 16, top: _buttonTop, figmaSpacing: true, onTap: () => CompanyController.createGroups(context)),
           ],
         );
       },

@@ -51,6 +51,19 @@ class _CompanyShellState extends State<CompanyShell> {
   }
 
   void _select(CompanyTab tab) {
+    // الرجوع لتبويب مفتوح من قبل بيحدّث بياناته من السيرفر (اللي تغيّر من جهاز تاني أو من المشرف)
+    if (_built.contains(tab)) {
+      switch (tab) {
+        case CompanyTab.home:
+          _home.load();
+        case CompanyTab.trips:
+          _trips.load();
+        case CompanyTab.groups:
+          _groups.load();
+        case CompanyTab.profile:
+          break;
+      }
+    }
     setState(() {
       _tab = tab;
       _built.add(tab);
