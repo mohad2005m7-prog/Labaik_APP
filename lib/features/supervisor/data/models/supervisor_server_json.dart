@@ -68,6 +68,32 @@ abstract final class SupervisorServerJson {
 
   static bool isSupervisorRow(Map<String, dynamic> j) => j.optionalInt('role') == 1;
 
+  /// البرنامج الحالي + نشاط جديد → أيام PUT (اليوم بينعمل لو مش موجود، والأيام والأنشطة بالترتيب)
+  static List<Map<String, dynamic>> addActivity(Map<String, dynamic> itinerary, {required DateTime day, required String title, DateTime? time, String? place}) {
+    String dateOnly(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final key = dateOnly(day);
+    final days = [
+      for (final d in (itinerary.field('days') as List?)?.whereType<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[])
+        {
+          'date': d.field('date')?.toString(),
+          'title': d.field('title'),
+          'activities': [
+            for (final a in (d.field('activities') as List?)?.whereType<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[])
+              {'title': a.field('title'), 'timeUtc': a.field('timeUtc'), 'place': a.field('place')},
+          ],
+        },
+    ];
+    var target = days.where((d) => d['date'] == key).firstOrNull;
+    if (target == null) {
+      target = {'date': key, 'title': null, 'activities': <Map<String, dynamic>>[]};
+      days.add(target);
+    }
+    (target['activities'] as List).add({'title': title.trim(), 'timeUtc': time?.toUtc().toIso8601String(), 'place': (place?.trim().isEmpty ?? true) ? null : place!.trim()});
+    (target['activities'] as List).sort((a, b) => (a['timeUtc']?.toString() ?? '~').compareTo(b['timeUtc']?.toString() ?? '~'));
+    days.sort((a, b) => a['date'].toString().compareTo(b['date'].toString()));
+    return days;
+  }
+
   /// TripItineraryDto → أيام البرنامج ("اليوم 1 — 12 أكتوبر 2026")
   static List<TripDay> program(Map<String, dynamic> itinerary) {
     final days = (itinerary.field('days') as List?)?.whereType<Map<String, dynamic>>().toList() ?? const <Map<String, dynamic>>[];
@@ -75,6 +101,7 @@ abstract final class SupervisorServerJson {
       for (final (i, d) in days.indexed)
         TripDay(
           number: i + 1,
+          date: DateTime.tryParse(d.field('date')?.toString() ?? ''),
           dateLabel: DateTime.tryParse(d.field('date')?.toString() ?? '') == null ? '' : SupFormat.date(DateTime.parse(d.field('date').toString())),
           activities: [
             for (final a in (d.field('activities') as List?)?.whereType<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[])

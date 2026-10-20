@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/theme/figma_text.dart';
 import '../../../../core/utils/figma_canvas.dart';
 import '../../../field_mode/presentation/widgets/back_title_header.dart';
@@ -11,6 +12,7 @@ import '../controllers/supervisor_controller.dart';
 import '../cubits/supervisor_content_cubits.dart';
 import '../l10n/trip_program_text.dart';
 import '../widgets/supervisor_colors.dart';
+import '../widgets/supervisor_format.dart';
 import '../widgets/supervisor_page.dart';
 import '../widgets/supervisor_widgets.dart';
 
@@ -86,6 +88,17 @@ class _ProgramViewState extends State<_ProgramView> {
                 ),
               ),
             ),
+            // تحميل / فشل / فاضي
+            if (!state.loaded) c.rect(left: 176, top: 300, width: 40, height: 40, child: const CircularProgressIndicator(strokeWidth: 2.4, color: SupColors.green)),
+            if (state.loaded && days.isEmpty && state.failed) ...[
+              c.text(TripProgramText.loadFailed(), left: 24, top: 300, width: 345, height: 44, align: TextAlign.center, style: supText(c, 14, FigmaWeight.sfRegular, SupColors.grey)),
+              c.tapArea(left: 24, top: 290, width: 345, height: 64, onTap: context.read<TripProgramCubit>().load),
+            ],
+            if (state.loaded && days.isEmpty && !state.failed) ...[
+              c.text(TripProgramText.empty(), left: 24, top: 280, width: 345, height: 24, align: TextAlign.center, style: supText(c, 18, FigmaWeight.sfBold, SupColors.green)),
+              c.text(TripProgramText.emptyHint(), left: 40, top: 314, width: 313, height: 44, align: TextAlign.center, style: supText(c, 13, FigmaWeight.sfRegular, SupColors.grey)),
+            ],
+            if (state.loaded) c.button(TripProgramText.add(), left: 16, top: 748, figmaSpacing: true, onTap: () => _addActivity(context, days)),
             PositionedDirectional(
               start: 0,
               end: 0,
@@ -95,6 +108,139 @@ class _ProgramViewState extends State<_ProgramView> {
           ],
         );
       },
+    );
+  }
+
+  /// "+ إضافة نشاط": اليوم (افتراضياً اليوم المفتوح) والوقت والاسم والمكان → PUT البرنامج
+  Future<void> _addActivity(BuildContext context, List<TripDay> days) async {
+    final cubit = context.read<TripProgramCubit>();
+    final page = _pages.hasClients ? (_pages.page ?? 0).round() : 0;
+    final added = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _AddActivitySheet(cubit: cubit, initialDay: page < days.length ? days[page].date : null),
+    );
+    if (added == true && context.mounted) SupervisorController.showMessage(context, TripProgramText.added);
+  }
+}
+
+/// نموذج إضافة نشاط — الأخطاء بتطلع جوّاه وبيضل مفتوح
+class _AddActivitySheet extends StatefulWidget {
+  final TripProgramCubit cubit;
+  final DateTime? initialDay;
+
+  const _AddActivitySheet({required this.cubit, this.initialDay});
+
+  @override
+  State<_AddActivitySheet> createState() => _AddActivitySheetState();
+}
+
+class _AddActivitySheetState extends State<_AddActivitySheet> {
+  final _title = TextEditingController();
+  final _place = TextEditingController();
+  late DateTime _day = widget.initialDay ?? DateTime.now();
+  TimeOfDay? _time;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _place.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDay() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(context: context, initialDate: _day, firstDate: DateTime(now.year - 1), lastDate: DateTime(now.year + 5));
+    if (picked != null) setState(() => _day = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(context: context, initialTime: _time ?? const TimeOfDay(hour: 6, minute: 0));
+    if (picked != null) setState(() => _time = picked);
+  }
+
+  Future<void> _save() async {
+    FocusScope.of(context).unfocus();
+    if (_title.text.trim().isEmpty) return setState(() => _error = TripProgramText.needTitle());
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final t = _time;
+    try {
+      await widget.cubit.addActivity(
+        day: _day,
+        title: _title.text,
+        time: t == null ? null : DateTime(_day.year, _day.month, _day.day, t.hour, t.minute),
+        place: _place.text,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e is StateError ? TripProgramText.noTrip() : ApiErrorText.of(e)();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const green = SupColors.green;
+    const label = TextStyle(fontFamily: 'NotoSansArabic', fontSize: 13, color: green);
+    const value = TextStyle(fontFamily: 'NotoSansArabic', fontSize: 14, color: green);
+    const hint = TextStyle(fontFamily: 'NotoSansArabic', fontSize: 14, color: SupColors.secondaryLabel);
+    final t = _time;
+    Widget box(Widget child, {VoidCallback? onTap}) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            height: 53,
+            alignment: AlignmentDirectional.centerStart,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(color: const Color(0xFFF9F9F9), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE5E5EA))),
+            child: child,
+          ),
+        );
+    Widget field(TextEditingController c, String h) => box(TextField(controller: c, enabled: !_busy, style: value, cursorColor: green, decoration: InputDecoration.collapsed(hintText: h, hintStyle: hint)));
+    Widget gap(String text) => Padding(padding: const EdgeInsets.only(top: 12, bottom: 8), child: Text(text, style: label));
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(TripProgramText.addTitle(), textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 18, fontWeight: FontWeight.bold, color: green)),
+            gap(TripProgramText.activityTitle()),
+            field(_title, TripProgramText.activityTitleHint()),
+            gap(TripProgramText.date()),
+            box(Text(SupFormat.date(_day), style: value), onTap: _busy ? null : _pickDay),
+            gap(TripProgramText.time()),
+            box(Text(t == null ? TripProgramText.timeHint() : SupFormat.longTime(DateTime(2000, 1, 1, t.hour, t.minute)), style: t == null ? hint : value), onTap: _busy ? null : _pickTime),
+            gap(TripProgramText.place()),
+            field(_place, TripProgramText.placeHint()),
+            if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 13, color: SupColors.red))),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 50,
+              child: FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                onPressed: _busy ? null : _save,
+                child: _busy
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                    : Text(TripProgramText.save(), style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

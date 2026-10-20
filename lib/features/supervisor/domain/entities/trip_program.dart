@@ -26,8 +26,11 @@ class TripDay extends Equatable {
   final String dateLabel;
   final List<TripActivity> activities;
 
-  const TripDay({required this.number, required this.dateLabel, required this.activities});
+  /// تاريخ اليوم (من السيرفر) — null بالبيانات القديمة
+  final DateTime? date;
+
+  const TripDay({required this.number, required this.dateLabel, required this.activities, this.date});
 
   @override
-  List<Object?> get props => [number, dateLabel, activities];
+  List<Object?> get props => [number, dateLabel, activities, date];
 }

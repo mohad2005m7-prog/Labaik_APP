@@ -20,12 +20,16 @@ class ListState<T> extends Equatable {
   final List<T> items;
   final String query;
 
-  const ListState({this.loaded = false, this.items = const [], this.query = ''});
+  /// آخر تحميل فشل (ما في إنترنت أو خطأ بالسيرفر) — والبيانات اللي معروضة هي آخر اللي وصل
+  final bool failed;
 
-  ListState<T> copyWith({bool? loaded, List<T>? items, String? query}) => ListState(loaded: loaded ?? this.loaded, items: items ?? this.items, query: query ?? this.query);
+  const ListState({this.loaded = false, this.items = const [], this.query = '', this.failed = false});
+
+  ListState<T> copyWith({bool? loaded, List<T>? items, String? query, bool? failed}) =>
+      ListState(loaded: loaded ?? this.loaded, items: items ?? this.items, query: query ?? this.query, failed: failed ?? this.failed);
 
   @override
-  List<Object?> get props => [loaded, items, query];
+  List<Object?> get props => [loaded, items, query, failed];
 }
 
 abstract class _ListCubit<T> extends Cubit<ListState<T>> {
@@ -36,10 +40,10 @@ abstract class _ListCubit<T> extends Cubit<ListState<T>> {
   Future<void> load() async {
     try {
       final items = await fetch();
-      if (!isClosed) emit(state.copyWith(loaded: true, items: items));
+      if (!isClosed) emit(state.copyWith(loaded: true, items: items, failed: false));
     } catch (_) {
       // ما في إنترنت أو السيرفر ما رد — بنضل على آخر بيانات وصلت
-      if (!isClosed) emit(state.copyWith(loaded: true));
+      if (!isClosed) emit(state.copyWith(loaded: true, failed: true));
     }
   }
 
@@ -115,6 +119,12 @@ class TripProgramCubit extends _ListCubit<TripDay> {
 
   @override
   Future<List<TripDay>> fetch() => _repository.getProgram(groupId);
+
+  /// بترمي الخطأ للشاشة (تعرض رسالته) — والبرنامج الجديد بيطلع فوراً
+  Future<void> addActivity({required DateTime day, required String title, DateTime? time, String? place}) async {
+    final days = await _repository.addProgramActivity(groupId, day: day, title: title, time: time, place: place);
+    if (!isClosed) emit(state.copyWith(loaded: true, items: days));
+  }
 }
 
 // ---------------- الدردشات ----------------

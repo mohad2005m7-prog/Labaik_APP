@@ -16,6 +16,10 @@ abstract class SupervisorRepository {
   Future<List<GroupMember>> getMembers(String groupId);
   Future<List<TripDay>> getProgram(String groupId);
 
+  /// إضافة نشاط لبرنامج الرحلة (اليوم بينعمل لو مش موجود) وبترجع البرنامج الجديد
+  /// StateError لو المجموعة مش مربوطة برحلة
+  Future<List<TripDay>> addProgramActivity(String groupId, {required DateTime day, required String title, DateTime? time, String? place});
+
   /// بطاقة العضو كاملة (الملاحظات الصحية) — [member] من القائمة
   Future<GroupMember> getMember(String groupId, GroupMember member);
 

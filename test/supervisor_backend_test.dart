@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:labaik/core/l10n/app_language.dart';
@@ -12,6 +14,8 @@ import 'package:labaik/features/supervisor/data/sources/announcements_api.dart';
 import 'package:labaik/features/supervisor/data/sources/supervisor_api.dart';
 import 'package:labaik/features/notifications/data/sources/notifications_api.dart';
 import 'package:labaik/features/supervisor/domain/entities/announcement.dart';
+import 'package:labaik/features/supervisor/domain/repositories/supervisor_repository.dart';
+import 'package:labaik/features/supervisor/presentation/pages/trip_program_screen.dart';
 import 'package:labaik/features/supervisor/domain/entities/group_member.dart';
 import 'package:labaik/features/supervisor/domain/entities/trip_program.dart';
 import 'package:labaik/features/supervisor/presentation/cubits/supervisor_content_cubits.dart';
@@ -183,6 +187,48 @@ void main() {
     expect((await repo.getMember('g1', members.single)).health, 'في حالة جيدة');
     final program = await repo.getProgram('g1');
     expect(program.single.activities.map((a) => (a.title, a.kind)), [('الاستعداد للعمرة', ActivityPlace.hotel), ('الطواف', ActivityPlace.haram)]);
+  });
+
+  testWidgets('trip program: empty → message + "إضافة نشاط" → the activity is saved with PUT and shows up', (tester) async {
+    tester.view.physicalSize = const Size(393 * 3, 852 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    Map<String, dynamic> itinerary = {'tripId': 't1', 'tripName': 'عمرة', 'days': <Object>[]};
+    final s = FakeServer({
+      'GET /supervisor/groups': (_) => [
+            {'id': 'g1', 'name': '111', 'tripId': 't1', 'tripName': 'عمرة', 'pilgrimCount': 0, 'presentCount': 0, 'absentCount': 0},
+          ],
+      'GET /home': (_) => {'group': null},
+      'GET /trips/t1/itinerary': (_) => itinerary,
+      'PUT /trips/t1/itinerary': (r) => itinerary = {'tripId': 't1', 'tripName': 'عمرة', 'days': (jsonDecode(r.body) as Map<String, dynamic>)['days']},
+    });
+    final repo = repository(s);
+    final group = (await repo.getGroups()).single;
+    await tester.pumpWidget(RepositoryProvider<SupervisorRepository>.value(
+      value: repo,
+      child: MaterialApp(
+        builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+        home: TripProgramScreen(group: group),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    Finder text(String v) => find.text(v, findRichText: true);
+    expect(text('لا يوجد برنامج للرحلة بعد'), findsOneWidget);
+    await tester.tap(text('+ إضافة نشاط'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'إضافة'));
+    await tester.pumpAndSettle();
+    expect(text('اكتب اسم النشاط'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'الاستعداد للعمرة');
+    await tester.enterText(find.byType(TextField).last, 'نقطة التجمع');
+    await tester.tap(find.widgetWithText(FilledButton, 'إضافة'));
+    await tester.pumpAndSettle();
+    final put = jsonDecode(s.requests.lastWhere((r) => r.method == 'PUT').body) as Map<String, dynamic>;
+    final day = (put['days'] as List).single as Map<String, dynamic>;
+    expect(((day['activities'] as List).single as Map)['title'], 'الاستعداد للعمرة');
+    expect(((day['activities'] as List).single as Map)['place'], 'نقطة التجمع');
+    expect(text('لا يوجد برنامج للرحلة بعد'), findsNothing);
+    expect(text('الاستعداد للعمرة'), findsOneWidget);
   });
 
   test('notification sections: unknown types are ignored, older days use the date', () {

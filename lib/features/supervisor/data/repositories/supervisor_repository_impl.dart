@@ -141,6 +141,19 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
   }
 
   @override
+  Future<List<TripDay>> addProgramActivity(String groupId, {required DateTime day, required String title, DateTime? time, String? place}) async {
+    var tripId = _tripOf[groupId];
+    if (tripId == null) {
+      await getGroups();
+      tripId = _tripOf[groupId];
+    }
+    if (tripId == null) throw StateError('no trip');
+    final current = await _supervisor.itinerary(tripId);
+    final days = SupervisorServerJson.addActivity(current, day: day, title: title, time: time, place: place);
+    return SupervisorServerJson.program(await _supervisor.replaceItinerary(tripId, days));
+  }
+
+  @override
   Future<void> setAttendance(String groupId, String memberId, {required bool present}) => _supervisor.setAttendance(groupId, memberId, present: present);
 
   @override

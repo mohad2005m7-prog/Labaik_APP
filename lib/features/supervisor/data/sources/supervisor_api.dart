@@ -7,7 +7,7 @@ import '../../../auth/data/token_refresher.dart';
 // -------------------------------------------------------------
 // بيانات المشرف من سيرفر لبيك (ملف إبراهيم flutter_handoff_2026-10-18):
 //   GET /supervisor/groups                      → SupervisorGroupDto[] { id, name, tripId?, tripName?, departureDate?, pilgrimCount, presentCount, absentCount }
-//   GET /trips/{tripId}/itinerary               → { tripId, tripName, days: [{ date, title?, activities: [{ title, timeUtc?, place? }] }] }
+//   GET/PUT /trips/{tripId}/itinerary           → { tripId, tripName, days: [{ date, title?, activities: [{ title, timeUtc?, place? }] }] }
 //   GET /groups/{id}/members                    → GroupMemberRowDto[] (المشرف أول — بلا ملاحظات صحية)
 //   GET /groups/{id}/members/{userId}           → GroupMemberDetailsDto (مع healthNotes و notes)
 //   PUT /groups/{id}/attendance/{userId}        → { status: 1 حاضر | 2 غائب }
@@ -22,6 +22,9 @@ class SupervisorApi {
   Future<List<Map<String, dynamic>>> groups() async => _list(await _client.getJson('/supervisor/groups'));
 
   Future<Map<String, dynamic>> itinerary(String tripId) async => _map(await _client.getJson('/trips/$tripId/itinerary'));
+
+  /// PUT /trips/{tripId}/itinerary { days } — استبدال البرنامج كله (الشركة أو مشرف الرحلة)
+  Future<Map<String, dynamic>> replaceItinerary(String tripId, List<Map<String, dynamic>> days) async => _map(await _client.putJson('/trips/$tripId/itinerary', body: {'days': days}));
 
   Future<List<Map<String, dynamic>>> members(String groupId) async => _list(await _client.getJson('/groups/$groupId/members'));
 
