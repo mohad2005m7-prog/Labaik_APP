@@ -61,6 +61,13 @@ class CompanyApi {
 
   Future<Map<String, dynamic>> addSupervisor(Map<String, dynamic> body) async => _map(await _client.postJson('/company/supervisors', body: body));
 
+  // التحكم بمشرف (لسا مش بالسيرفر — ملف إبراهيم): حذف من الشركة / إيقاف وتفعيل / كلمة مؤقتة جديدة
+  Future<void> removeSupervisor(String userId) => _client.delete('/company/supervisors/$userId');
+
+  Future<void> setSupervisorSuspended(String userId, {required bool suspended}) => _client.postJson('/company/supervisors/$userId/${suspended ? 'disable' : 'enable'}');
+
+  Future<String> supervisorTempPassword(String userId) async => _map(await _client.postJson('/company/supervisors/$userId/temp-password'))['temporaryPassword']?.toString() ?? '';
+
   Future<List<Map<String, dynamic>>> notifications({int take = 50}) async => _list(await _client.getJson('/notifications', query: {'take': '$take'}));
 
   static Map<String, dynamic> _map(Object? data) {

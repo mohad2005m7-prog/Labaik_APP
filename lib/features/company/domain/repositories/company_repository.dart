@@ -52,6 +52,15 @@ abstract class CompanyRepository {
   /// إضافة مشرف لقائمة الشركة (كلمة مؤقتة بالإيميل)
   Future<CompanySupervisor> addSupervisor({required String fullName, required String email, String? phone});
 
+  /// حذف مشرف من قائمة الشركة (409 لو لسا بيشرف على مجموعة)
+  Future<void> removeSupervisor(String userId);
+
+  /// إيقاف حساب مشرف (ما بيقدر يدخل) أو تفعيله
+  Future<void> setSupervisorSuspended(String userId, {required bool suspended});
+
+  /// كلمة مرور مؤقتة جديدة للمشرف (بتنبعتله بالإيميل وبترجع هون مرة وحدة) — "" لو السيرفر ما رجّعها
+  Future<String> supervisorTempPassword(String userId);
+
   /// تعيين (أو تبديل) مشرف المجموعة — لازم يكون بقائمة الشركة
   Future<CompanyGroup> assignSupervisor(String groupId, String email);
 }

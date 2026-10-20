@@ -35,6 +35,7 @@ class CompanyMember extends Equatable {
 
 // -------------------------------------------------------------
 // مشرف بقائمة الشركة (CompanySupervisorDto) — [groupsCount] = كم مجموعة بيشرف عليها
+// [suspended] = الشركة موقفة حسابه (isDisabled من السيرفر — لسا مش موجود، فبيضل false)
 // -------------------------------------------------------------
 class CompanySupervisor extends Equatable {
   final String userId;
@@ -42,9 +43,12 @@ class CompanySupervisor extends Equatable {
   final String email;
   final String? phone;
   final int groupsCount;
+  final bool suspended;
 
-  const CompanySupervisor({required this.userId, required this.name, required this.email, this.phone, this.groupsCount = 0});
+  const CompanySupervisor({required this.userId, required this.name, required this.email, this.phone, this.groupsCount = 0, this.suspended = false});
+
+  CompanySupervisor copyWith({bool? suspended}) => CompanySupervisor(userId: userId, name: name, email: email, phone: phone, groupsCount: groupsCount, suspended: suspended ?? this.suspended);
 
   @override
-  List<Object?> get props => [userId, name, email, phone, groupsCount];
+  List<Object?> get props => [userId, name, email, phone, groupsCount, suspended];
 }

@@ -20,6 +20,8 @@ import 'package:labaik/features/company/presentation/cubits/company_trips_cubit.
 import 'package:labaik/features/company/presentation/pages/company_create_trip_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_group_detail_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_members_screen.dart';
+import 'package:labaik/features/company/presentation/pages/company_supervisor_screen.dart';
+import 'package:labaik/features/company/presentation/pages/company_supervisors_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_create_group_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_data_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_notifications_screen.dart';
@@ -48,6 +50,23 @@ class FakeCompany implements CompanyRepository {
 
   @override
   Future<CompanyProfile> updateProfile(CompanyProfile profile) async => profileData = profile;
+
+  final removedSupervisors = <String>[];
+
+  @override
+  Future<void> removeSupervisor(String userId) async {
+    removedSupervisors.add(userId);
+    rosterList.removeWhere((s) => s.userId == userId);
+  }
+
+  @override
+  Future<void> setSupervisorSuspended(String userId, {required bool suspended}) async {
+    final i = rosterList.indexWhere((s) => s.userId == userId);
+    rosterList[i] = rosterList[i].copyWith(suspended: suspended);
+  }
+
+  @override
+  Future<String> supervisorTempPassword(String userId) async => 'Tmp#2026ab';
 
   @override
   Future<String> uploadLogo(String filePath) async => 'https://cdn.example.com/logo.png';
@@ -393,5 +412,46 @@ void main() {
     expect(find.byType(CompanyDataScreen), findsNothing);
     expect(repo.profileData.name, 'شركة الهدى');
     expect(text('شركة الهدى'), findsOneWidget);
+  });
+
+  testWidgets('manage supervisors: open a supervisor → temp password, suspend, remove (only without groups)', (tester) async {
+    tester.view.physicalSize = const Size(393 * 3, 852 * 3);
+    tester.view.devicePixelRatio = 3;
+    tester.view.padding = const FakeViewPadding(top: 59 * 3, bottom: 34 * 3);
+    tester.view.viewPadding = const FakeViewPadding(top: 59 * 3, bottom: 34 * 3);
+    addTearDown(tester.view.reset);
+    final repo = FakeCompany();
+    await repo.addSupervisor(fullName: 'سندس جوادة', email: 's@x.com');
+    await tester.pumpWidget(MaterialApp(
+      builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+      home: CompanySupervisorsScreen(repository: repo),
+    ));
+    await tester.pumpAndSettle();
+    Finder text(String v) => find.text(v, findRichText: true);
+    await tester.tap(text('سندس جوادة'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanySupervisorScreen), findsOneWidget);
+    expect(text('الحساب مفعّل'), findsOneWidget);
+    expect(text('لا يشرف على أي مجموعة بعد'), findsOneWidget);
+
+    await tester.tap(text('إصدار كلمة مرور مؤقتة'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(text('كلمة المرور المؤقتة: Tmp#2026ab'), findsOneWidget);
+
+    await tester.tap(text('إيقاف الحساب'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'إيقاف الحساب'));
+    await tester.pumpAndSettle();
+    expect(text('الحساب موقوف'), findsOneWidget);
+    expect(text('تفعيل الحساب'), findsOneWidget);
+    expect(repo.rosterList.single.suspended, isTrue);
+
+    await tester.tap(text('حذف من الشركة'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'حذف من الشركة'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanySupervisorScreen), findsNothing);
+    expect(repo.removedSupervisors, hasLength(1));
+    expect(text('سندس جوادة'), findsNothing);
   });
 }

@@ -121,6 +121,15 @@ class CompanyRepositoryImpl implements CompanyRepository {
       }));
 
   @override
+  Future<void> removeSupervisor(String userId) => _api.removeSupervisor(userId);
+
+  @override
+  Future<void> setSupervisorSuspended(String userId, {required bool suspended}) => _api.setSupervisorSuspended(userId, suspended: suspended);
+
+  @override
+  Future<String> supervisorTempPassword(String userId) => _api.supervisorTempPassword(userId);
+
+  @override
   Future<CompanyGroup> assignSupervisor(String groupId, String email) async {
     final json = await _api.assignSupervisor(groupId, email.trim());
     return CompanyJson.group(json, trip: await _tripOf(json['tripId']?.toString() ?? ''));

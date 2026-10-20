@@ -126,6 +126,7 @@ abstract final class CompanyJson {
         email: _str(j, 'email'),
         phone: _opt(j, 'phoneNumber'),
         groupsCount: j.optionalInt('groupsCount') ?? 0,
+        suspended: j.field('isDisabled') == true || j.field('isSuspended') == true,
       );
 
   /// NotificationDto — للشركة: 3 مجموعة جديدة، 4 تفعيل مشرف، 5 مجموعة بلا مشرف (والباقي بعنوان عام)

@@ -51,6 +51,32 @@ abstract final class CompanyProfileText {
   static const noSupervisors = Tx('لا يوجد مشرفين بعد', 'No supervisors yet');
   static const addSupervisor = Tx('إضافة مشرف', 'Add supervisor');
 
+  // تفاصيل المشرف (التحكم)
+  static const supervisorTitle = Tx('بيانات المشرف', 'Supervisor');
+  static const suspendedBadge = Tx('الحساب موقوف', 'Account suspended');
+  static const activeBadge = Tx('الحساب مفعّل', 'Account active');
+  static const emailLabel = Tx('البريد الإلكتروني', 'Email');
+  static const phoneLabel = Tx('رقم الهاتف', 'Phone');
+  static const groupsLabel = Tx('المجموعات', 'Groups');
+  static const noGroups = Tx('لا يشرف على أي مجموعة بعد', 'Not supervising any group yet');
+  static const actions = Tx('التحكم بالحساب', 'Account control');
+  static const tempPassword = Tx('إصدار كلمة مرور مؤقتة', 'Issue a temporary password');
+  static const tempPasswordDone = Tx('تم إرسال كلمة مرور مؤقتة جديدة إلى بريد المشرف', 'A new temporary password was emailed to the supervisor');
+  static String tempPasswordValue(Object p) => tr('كلمة المرور المؤقتة: $p', 'Temporary password: $p');
+  static const suspend = Tx('إيقاف الحساب', 'Suspend account');
+  static const resume = Tx('تفعيل الحساب', 'Reactivate account');
+  static const suspendConfirm = Tx('إيقاف حساب المشرف؟ لن يستطيع تسجيل الدخول حتى تعيد تفعيله.', "Suspend this supervisor? They can't log in until you reactivate them.");
+  static const suspended = Tx('تم إيقاف الحساب', 'Account suspended');
+  static const resumed = Tx('تم تفعيل الحساب', 'Account reactivated');
+  static const remove = Tx('حذف من الشركة', 'Remove from company');
+  static const removeConfirm = Tx('حذف المشرف من قائمة الشركة؟ لازم أولاً تغيّر مشرف مجموعاته.', 'Remove this supervisor from your company? Reassign their groups first.');
+  static const removed = Tx('تم حذف المشرف', 'Supervisor removed');
+  static const removeHasGroups = Tx('المشرف لسا مسؤول عن مجموعات — غيّر مشرفها أولاً', 'Still supervising groups — reassign them first');
+  static const notOnServer = Tx('هذه العملية غير متاحة على الخادم بعد (بانتظار إبراهيم)', 'Not available on the server yet');
+  static const confirm = Tx('تأكيد', 'Confirm');
+  static const cancel = Tx('إلغاء', 'Cancel');
+  static const call = Tx('اتصال', 'Call');
+
   // إضافة مشرف جديد
   static const addTitle = Tx('إضافة مشرف جديد', 'Add New Supervisor');
   static const fullName = Tx('الاسم الكامل *', 'Full name *');
