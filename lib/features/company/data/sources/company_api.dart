@@ -27,6 +27,14 @@ class CompanyApi {
 
   Future<Map<String, dynamic>> updateMe(Map<String, dynamic> body) async => _map(await _client.putJson('/company/me', body: body));
 
+  /// رفع صورة (الشعار): POST /files multipart → { url } — لسا مش بالسيرفر (404 لحد ما يضيفه إبراهيم)
+  Future<String> uploadFile(String path) async {
+    final data = _map(await _client.postMultipart('/files', files: {'file': path}));
+    final url = data['url']?.toString() ?? '';
+    if (url.isEmpty) throw const FormatException('Missing url');
+    return url;
+  }
+
   Future<Map<String, dynamic>> home() async => _map(await _client.getJson('/company/home'));
 
   Future<List<Map<String, dynamic>>> trips() async => _list(await _client.getJson('/company/trips'));

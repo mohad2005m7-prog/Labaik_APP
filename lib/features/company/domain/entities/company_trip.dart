@@ -18,8 +18,11 @@ class CompanyTrip extends Equatable {
   final CompanyTripStatus status;
   final DateTime? departureDate;
   final DateTime? returnDate;
+  final PilgrimageKind kind;
 
-  const CompanyTrip({required this.id, required this.title, required this.destinations, required this.dates, required this.status, this.departureDate, this.returnDate});
+  const CompanyTrip({required this.id, required this.title, required this.destinations, required this.dates, required this.status, this.departureDate, this.returnDate, this.kind = PilgrimageKind.umrah});
+
+  bool get isHajj => kind == PilgrimageKind.hajj;
 
   bool endedOn(DateTime today) {
     final r = returnDate;
@@ -27,7 +30,7 @@ class CompanyTrip extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, title, destinations, dates, status, departureDate, returnDate];
+  List<Object?> get props => [id, title, destinations, dates, status, departureDate, returnDate, kind];
 }
 
 // -------------------------------------------------------------

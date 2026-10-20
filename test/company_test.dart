@@ -50,6 +50,9 @@ class FakeCompany implements CompanyRepository {
   Future<CompanyProfile> updateProfile(CompanyProfile profile) async => profileData = profile;
 
   @override
+  Future<String> uploadLogo(String filePath) async => 'https://cdn.example.com/logo.png';
+
+  @override
   Future<void> removeMember(String groupId, String userId) async => membersList.removeWhere((m) => m.userId == userId);
 
   @override
@@ -306,9 +309,9 @@ void main() {
     expect(find.byType(CompanyCreateGroupScreen), findsOneWidget);
     await tester.tap(text('إنشاء المجموعة'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(text('اختار الرحلة واكتب اسم المجموعة'), findsOneWidget);
+    expect(text('اختر الرحلة واكتب اسم المجموعة'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'مجموعة أ');
-    await tester.tap(text('اختار الرحلة'), warnIfMissed: false);
+    await tester.tap(text('اختر الرحلة'), warnIfMissed: false);
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('رحلة العمرة الأولى').last);
     await tester.pumpAndSettle();

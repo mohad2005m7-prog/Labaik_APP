@@ -24,7 +24,7 @@ abstract final class CompanyProfileText {
   static const licenseLabel = Tx('رقم الترخيص :', 'License number:');
   static const licenseHint = Tx('LAB-2026-014', 'LAB-2026-014');
   static const countryLabel = Tx('الدولة :', 'Country:');
-  static const countryHint = Tx('اختار الدولة', 'Choose the country');
+  static const countryHint = Tx('اختر الدولة', 'Choose the country');
   static const cityLabel = Tx('المدينة', 'City');
   static const cityHint = Tx('اكتب المدينة', 'Enter the city');
   static const save = Tx('حفظ التعديلات', 'Save changes');

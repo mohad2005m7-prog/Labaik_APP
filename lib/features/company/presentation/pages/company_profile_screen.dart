@@ -7,6 +7,7 @@ import '../../../../core/widgets/figma_lines.dart';
 import '../../../supervisor/presentation/widgets/supervisor_widgets.dart';
 import '../controllers/company_controller.dart';
 import '../cubits/company_profile_cubit.dart';
+import '../../../../core/l10n/countries.dart';
 import '../l10n/company_profile_text.dart';
 import '../widgets/company_box.dart';
 import '../widgets/company_colors.dart';
@@ -65,7 +66,7 @@ class CompanyProfileScreen extends StatelessWidget {
             c.tapArea(left: 22, top: 316, width: 348, height: 40, onTap: () => CompanyController.openCompanyData(context)),
 
             ..._info(c, CompanyProfileText.licenseNumber(), p?.licenseNumber, top: 368),
-            ..._info(c, CompanyProfileText.country(), p?.country, top: 402),
+            ..._info(c, CompanyProfileText.country(), CompanyCountries.label(p?.country), top: 402),
             ..._info(c, CompanyProfileText.city(), p?.city, top: 441),
 
             // "إدارة الحساب"

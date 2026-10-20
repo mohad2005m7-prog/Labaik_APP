@@ -50,6 +50,7 @@ abstract final class CompanyJson {
       status: j.optionalInt('status') == 2 ? CompanyTripStatus.departed : CompanyTripStatus.upcoming,
       departureDate: from,
       returnDate: to,
+      kind: j.optionalInt('pilgrimageType') == 2 ? PilgrimageKind.hajj : PilgrimageKind.umrah,
     );
   }
 
@@ -76,6 +77,7 @@ abstract final class CompanyJson {
         supervisorName: _opt(j, 'supervisorName'),
         memberCount: j.optionalInt('pilgrimCount') ?? 0,
         status: trip != null && trip.endedOn(today ?? DateTime.now()) ? CompanyGroupStatus.ended : CompanyGroupStatus.active,
+        hajj: trip?.isHajj ?? false,
       );
 
   static CompanyProfile profile(Map<String, dynamic> j) => CompanyProfile(

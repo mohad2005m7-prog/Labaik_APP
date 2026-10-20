@@ -215,10 +215,10 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
           ),
           // 2. اسم الرحلة
           label(CompanyCreateTripText.tripName(), 216),
-          textField(_name, CompanyCreateTripText.tripNameHint(), 246),
+          textField(_name, CompanyCreateTripText.tripNameHint(hajj: _tripTypeIndex == 1), 246),
           // 3. الوجهات
           label(CompanyCreateTripText.destinations(), 319),
-          textField(_destinations, CompanyCreateTripText.destinationsHint(), 349),
+          textField(_destinations, CompanyCreateTripText.destinationsHint(hajj: _tripTypeIndex == 1), 349),
           // 4. تاريخ الذهاب
           label(CompanyCreateTripText.departureDate(), 422),
           dateField(_departureDate, CompanyCreateTripText.departureDateHint(), 452, true),
@@ -226,7 +226,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
           label(CompanyCreateTripText.returnDate(), 525),
           dateField(_returnDate, CompanyCreateTripText.returnDateHint(), 555, false),
           // 6. عدد المعتمرين
-          label(CompanyCreateTripText.pilgrimsCount(), 628),
+          label(CompanyCreateTripText.pilgrimsCount(hajj: _tripTypeIndex == 1), 628),
           textField(_pilgrims, CompanyCreateTripText.pilgrimsCountHint(), 658, keyboard: TextInputType.number),
           // 7. مكان الانطلاق
           label(CompanyCreateTripText.departurePoint(), 731),

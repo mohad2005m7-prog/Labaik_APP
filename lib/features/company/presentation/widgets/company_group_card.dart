@@ -29,7 +29,7 @@ abstract final class CompanyGroupCard {
       companyBox(c, left: 316, top: top + 18, width: 45, height: 45, radius: 8, color: CompanyColors.cardInset, shadow: CompanyColors.shadow),
       c.image('$companyAssets/ic_groups.png', left: 327, top: top + 29, width: 24, height: 24, color: green),
       FigmaLines.build(c, group.name, left: 128, top: top + 16, width: 180, style: c.style(14, FigmaWeight.semiBold, green), wrap: false),
-      FigmaLines.build(c, CompanyGroupsText.pilgrimCount(group.memberCount), left: 128, top: top + 42, width: 180, style: c.style(12, FigmaWeight.sfRegular, green), wrap: false),
+      FigmaLines.build(c, CompanyGroupsText.pilgrimCount(group.memberCount, hajj: group.hajj), left: 128, top: top + 42, width: 180, style: c.style(12, FigmaWeight.sfRegular, green), wrap: false),
       FigmaLines.build(c, CompanyGroupsText.supervisorLine(group.supervisorName ?? CompanyGroupsText.noSupervisor()), left: 128, top: top + 68, width: 180, style: c.style(12, FigmaWeight.sfRegular, green), wrap: false),
       // الشارة
       companyBox(c, left: 32, top: top + 17, width: 83, height: 21, radius: 10.5, color: complete ? green : CompanyColors.incomplete),

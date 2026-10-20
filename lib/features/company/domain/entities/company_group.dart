@@ -18,6 +18,9 @@ class CompanyGroup extends Equatable {
   final String joinCode;
   final String? supervisorName;
 
+  /// رحلة حج (العدد بيطلع "حاج" بدل "معتمر")
+  final bool hajj;
+
   const CompanyGroup({
     required this.id,
     required this.name,
@@ -28,6 +31,7 @@ class CompanyGroup extends Equatable {
     this.tripId = '',
     this.joinCode = '',
     this.supervisorName,
+    this.hajj = false,
   });
 
   CompanyGroup copyWith({int? memberCount, String? supervisorName}) => CompanyGroup(
@@ -40,8 +44,9 @@ class CompanyGroup extends Equatable {
         tripId: tripId,
         joinCode: joinCode,
         supervisorName: supervisorName ?? this.supervisorName,
+        hajj: hajj,
       );
 
   @override
-  List<Object?> get props => [id, name, tripName, memberCount, status, thumbnail, tripId, joinCode, supervisorName];
+  List<Object?> get props => [id, name, tripName, memberCount, status, thumbnail, tripId, joinCode, supervisorName, hajj];
 }

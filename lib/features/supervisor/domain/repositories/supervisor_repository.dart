@@ -15,6 +15,12 @@ abstract class SupervisorRepository {
   Future<List<SupervisorGroup>> getGroups();
   Future<List<GroupMember>> getMembers(String groupId);
   Future<List<TripDay>> getProgram(String groupId);
+
+  /// بطاقة العضو كاملة (الملاحظات الصحية) — [member] من القائمة
+  Future<GroupMember> getMember(String groupId, GroupMember member);
+
+  /// تسجيل حضور/غياب معتمر يدوياً
+  Future<void> setAttendance(String groupId, String memberId, {required bool present});
   Future<List<NotificationSection>> getNotifications();
   Future<List<ChatThread>> getChats();
 

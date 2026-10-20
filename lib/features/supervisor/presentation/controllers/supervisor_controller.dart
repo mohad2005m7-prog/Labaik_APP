@@ -56,7 +56,12 @@ class SupervisorController {
 
   static void openProgram(BuildContext context, SupervisorGroup group) => _push(context, TripProgramScreen(group: group));
 
-  static void openMember(BuildContext context, GroupMember member) => _push(context, MemberDetailsScreen(member: member));
+  /// صفحة العضو — بنجيب بطاقته الكاملة (الملاحظات الصحية) من السيرفر لو عرفنا مجموعته
+  static Future<void> openMember(BuildContext context, GroupMember member, {String? groupId}) async {
+    var m = member;
+    if (groupId != null) m = await context.read<SupervisorRepository>().getMember(groupId, member);
+    if (context.mounted) _push(context, MemberDetailsScreen(member: m));
+  }
 
   static void openAnnouncement(BuildContext context, Announcement announcement) => _push(context, AnnouncementDetailsScreen(announcement: announcement));
 

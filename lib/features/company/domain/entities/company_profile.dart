@@ -27,10 +27,10 @@ class CompanyProfile extends Equatable {
     this.phone,
   });
 
-  CompanyProfile copyWith({String? name, String? licenseNumber, String? country, String? city, String? email, String? phone, String? contactName}) => CompanyProfile(
+  CompanyProfile copyWith({String? logoUrl, String? name, String? licenseNumber, String? country, String? city, String? email, String? phone, String? contactName}) => CompanyProfile(
         id: id,
         name: name ?? this.name,
-        logoUrl: logoUrl,
+        logoUrl: logoUrl ?? this.logoUrl,
         licenseNumber: licenseNumber ?? this.licenseNumber,
         country: country ?? this.country,
         city: city ?? this.city,

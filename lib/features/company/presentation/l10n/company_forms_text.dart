@@ -41,7 +41,7 @@ abstract final class CompanyFormsText {
 
   // المشرفين
   static const assignTitle = Tx('مشرف المجموعة', 'Group supervisor');
-  static const assignSubtitle = Tx('اختار مشرف من مشرفي الشركة', "Pick one of your company's supervisors");
+  static const assignSubtitle = Tx('اختر مشرف من مشرفي الشركة', "Pick one of your company's supervisors");
   static const supervisor = Tx('المشرف :', 'Supervisor:');
   static const assign = Tx('تعيين', 'Assign');
   static const assigned = Tx('تم تعيين المشرف', 'Supervisor assigned');

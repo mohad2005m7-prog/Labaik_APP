@@ -109,7 +109,7 @@ class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
 
           // الأرقام
           ..._stat(c, left: 277, value: groups.length, label: CompanyTripsText.groupsStat()),
-          ..._stat(c, left: 149, value: pilgrims, label: CompanyTripsText.pilgrimsStat()),
+          ..._stat(c, left: 149, value: pilgrims, label: CompanyTripsText.pilgrimsStat(hajj: trip.isHajj)),
           ..._stat(c, left: 22, value: supervisors, label: CompanyTripsText.supervisorsStat()),
 
           FigmaLines.build(c, CompanyTripsText.distribution(), left: 177, top: 395, width: 200, style: c.style(20, FigmaWeight.sfBold, green, lineHeight: 24), lineHeight: 24, wrap: false),

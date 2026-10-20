@@ -17,6 +17,9 @@ abstract class CompanyRepository {
   /// حفظ بيانات الشركة (PUT /company/me — استبدال كامل) وبترجع المحفوظ
   Future<CompanyProfile> updateProfile(CompanyProfile profile);
 
+  /// رفع شعار الشركة (صورة من الجهاز) → رابطه — بعدها updateProfile بـ logoUrl
+  Future<String> uploadLogo(String filePath);
+
   /// كل رحلات الشركة (الفلترة "القادمة" / "الراحلة" والبحث بالشاشة)
   Future<List<CompanyTrip>> trips();
 

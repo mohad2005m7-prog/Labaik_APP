@@ -117,7 +117,7 @@ class _MembersList extends StatelessWidget {
     final heroTag = 'member-${tab.name}-${m.id}';
     final photo = m.photo;
     return [
-      c.tapArea(left: 0, top: top, width: 393, height: 53, onTap: () => SupervisorController.openMember(context, m)),
+      c.tapArea(left: 0, top: top, width: 393, height: 53, onTap: () => SupervisorController.openMember(context, m, groupId: context.read<GroupMembersCubit>().groupId)),
       c.rect(left: 324, top: top + 5, width: 45, height: 45, child: SupPhoto(photo: photo, size: c.s.x(45), name: m.name, heroTag: heroTag)),
       if (photo != null) c.tapArea(left: 322, top: top + 3, width: 49, height: 49, onTap: () => SupervisorController.viewPhoto(context, photo: photo, heroTag: heroTag, title: m.name)),
       // SF Compact Bold 16 — #717171 — طرفه x315

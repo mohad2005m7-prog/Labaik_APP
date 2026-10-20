@@ -96,6 +96,9 @@ class CompanyRepositoryImpl implements CompanyRepository {
   }
 
   @override
+  Future<String> uploadLogo(String filePath) => _api.uploadFile(filePath);
+
+  @override
   Future<void> removeMember(String groupId, String userId) => _api.removeMember(groupId, userId);
 
   @override

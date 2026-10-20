@@ -17,7 +17,7 @@ abstract final class CompanyTripsText {
   // تفاصيل الرحلة (738:4590)
   static const detailsTitle = Tx('تفاصيل الرحلة', 'Trip Details');
   static const groupsStat = Tx('مجموعات', 'Groups');
-  static const pilgrimsStat = Tx('معتمر', 'Pilgrims');
+  static String pilgrimsStat({bool hajj = false}) => hajj ? tr('حاج', 'Pilgrims') : tr('معتمر', 'Pilgrims');
   static const supervisorsStat = Tx('المشرفين', 'Supervisors');
   static const distribution = Tx('توزيع المجموعة', 'Group distribution');
 

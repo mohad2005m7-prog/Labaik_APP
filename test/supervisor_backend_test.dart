@@ -9,8 +9,11 @@ import 'package:labaik/features/group/data/sources/group_realtime.dart';
 import 'package:labaik/features/supervisor/data/models/notification_sections.dart';
 import 'package:labaik/features/supervisor/data/repositories/supervisor_repository_impl.dart';
 import 'package:labaik/features/supervisor/data/sources/announcements_api.dart';
+import 'package:labaik/features/supervisor/data/sources/supervisor_api.dart';
 import 'package:labaik/features/notifications/data/sources/notifications_api.dart';
 import 'package:labaik/features/supervisor/domain/entities/announcement.dart';
+import 'package:labaik/features/supervisor/domain/entities/group_member.dart';
+import 'package:labaik/features/supervisor/domain/entities/trip_program.dart';
 import 'package:labaik/features/supervisor/presentation/cubits/supervisor_content_cubits.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -60,7 +63,7 @@ void main() {
 
   SupervisorRepositoryImpl repository(FakeServer s) {
     final client = s.client();
-    return SupervisorRepositoryImpl(groups: GroupApi(client), announcements: AnnouncementsApi(client), notifications: NotificationsApi(client), chat: GroupChatApi(client));
+    return SupervisorRepositoryImpl(groups: GroupApi(client), announcements: AnnouncementsApi(client), notifications: NotificationsApi(client), chat: GroupChatApi(client), supervisor: SupervisorApi(client));
   }
 
   test('group, members, chats and notifications from the server', () async {
@@ -125,7 +128,7 @@ void main() {
       dateLabel: '',
       timeLabel: '',
     ));
-    expect(jsonDecode(s.requests.last.body), {'title': 'تعديل موعد الزيارة', 'body': 'تم تعديل الموعد'});
+    expect(jsonDecode(s.requests.last.body), {'title': 'تعديل موعد الزيارة', 'body': 'تم تعديل الموعد', 'importance': 2});
     expect(saved.id, 'a2');
     expect(saved.type, AnnouncementType.important);
 
@@ -137,6 +140,49 @@ void main() {
           ],
     }));
     expect((await again.getAnnouncements()).single.type, AnnouncementType.important);
+  });
+
+  test('new server: groups with attendance + next activity from the itinerary, members with number, member card, program', () async {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    String day(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final s = FakeServer({
+      ...server().routes,
+      'GET /supervisor/groups': (_) => [
+            {'id': 'g1', 'name': 'المجموعة الأولى', 'tripId': 't1', 'tripName': 'عمرة ديسمبر', 'departureDate': day(tomorrow), 'pilgrimCount': 25, 'presentCount': 22, 'absentCount': 3},
+          ],
+      'GET /trips/t1/itinerary': (_) => {
+            'tripId': 't1',
+            'tripName': 'عمرة ديسمبر',
+            'days': [
+              {
+                'date': day(tomorrow),
+                'title': 'اليوم الأول',
+                'activities': [
+                  {'title': 'الاستعداد للعمرة', 'timeUtc': DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 6).toUtc().toIso8601String(), 'place': 'نقطة التجمع'},
+                  {'title': 'الطواف', 'timeUtc': DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9).toUtc().toIso8601String(), 'place': 'الحرم'},
+                ],
+              },
+            ],
+          },
+      'GET /groups/g1/members': (_) => [
+            {'userId': 'lead', 'fullName': 'المشرف', 'role': 1, 'attendanceStatus': 2},
+            {'userId': 'u1', 'fullName': 'رولا عبدالله', 'email': 'r@x.com', 'role': 2, 'memberNumberInGroup': 15, 'gender': 2, 'nationality': 'فلسطينية', 'attendanceStatus': 1},
+          ],
+      'GET /groups/g1/members/u1': (_) => {'userId': 'u1', 'fullName': 'رولا عبدالله', 'role': 2, 'memberNumberInGroup': 15, 'gender': 2, 'healthNotes': 'في حالة جيدة', 'attendanceStatus': 1},
+    });
+    final repo = repository(s);
+    final g = (await repo.getGroups()).single;
+    expect([g.totalPilgrims, g.presentCount, g.absentCount], [25, 22, 3]);
+    expect(g.nextTripTitle, 'الاستعداد للعمرة');
+    expect(g.nextTripDetails, '06:00 صباحًا : نقطة التجمع');
+    final members = await repo.getMembers('g1');
+    expect(members.single.name, 'رولا عبدالله');
+    expect(members.single.number, 15);
+    expect(members.single.present, isTrue);
+    expect(members.single.gender, MemberGender.female);
+    expect((await repo.getMember('g1', members.single)).health, 'في حالة جيدة');
+    final program = await repo.getProgram('g1');
+    expect(program.single.activities.map((a) => (a.title, a.kind)), [('الاستعداد للعمرة', ActivityPlace.hotel), ('الطواف', ActivityPlace.haram)]);
   });
 
   test('notification sections: unknown types are ignored, older days use the date', () {

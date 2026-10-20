@@ -116,7 +116,7 @@ class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
 
           // تاريخ الرحلة / المعتمرون
           ..._stat(c, left: 206, icon: 'ic_create_trip', iconLeft: 336, label: CompanyGroupsText.tripDate(), labelRight: 322, value: date == null ? '—' : '${date.day}/${date.month}/${date.year}', valueRight: 328),
-          ..._stat(c, left: 19, icon: 'ic_groups', iconLeft: 149, label: CompanyGroupsText.pilgrims(), labelRight: 141, value: '${group.memberCount}', valueRight: 122),
+          ..._stat(c, left: 19, icon: 'ic_groups', iconLeft: 149, label: CompanyGroupsText.pilgrims(hajj: group.hajj), labelRight: 141, value: '${group.memberCount}', valueRight: 122),
 
           // عرض جميع الاعضاء (أو إضافة لو فاضية)
           companyBox(c, left: 16, top: 350, width: 361, height: 53, radius: 10, color: CompanyColors.statCard, shadow: CompanyColors.greenShadow),
@@ -167,7 +167,7 @@ class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
           // رمز الانضمام
           if (group.joinCode.isNotEmpty) ...[
             companyBox(c, left: 16, top: 640, width: 361, height: 64, radius: 10, color: CompanyColors.card, shadow: CompanyColors.shadow),
-            FigmaLines.build(c, CompanyGroupsText.joinCode(), left: 120, top: 650, width: 241, style: c.style(12, FigmaWeight.sfRegular, CompanyColors.secondaryLabel), wrap: false),
+            FigmaLines.build(c, CompanyGroupsText.joinCode(hajj: group.hajj), left: 120, top: 650, width: 241, style: c.style(12, FigmaWeight.sfRegular, CompanyColors.secondaryLabel), wrap: false),
             FigmaLines.build(c, group.joinCode, left: 120, top: 672, width: 241, style: c.style(18, FigmaWeight.sfBold, green, letterSpacing: 2), wrap: false),
             c.rect(left: 32, top: 660, width: 24, height: 24, child: Icon(Icons.copy_rounded, size: c.s.x(22), color: const Color(0xFF4C7A75))),
             c.tapArea(left: 16, top: 640, width: 361, height: 64, onTap: _copyCode),
