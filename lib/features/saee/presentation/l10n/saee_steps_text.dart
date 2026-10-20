@@ -76,18 +76,18 @@ abstract final class SaeeStepsText {
 
   // أتمم تحللك من العمرة
   static const tahallulTitle = Tx('أتمم تحللك من العمرة', 'Complete your Tahallul from Umrah');
-  static const tahallulSubtitle = Tx('بقيت خطوة أخيرة، وبعدها تكون قد أتممت عمرتك بإذن ❤️ الله', 'One last step — then your Umrah is complete, by Allah\'s grace ❤️');
-  static const tahallulMenHeader = Tx('للرجال: (الحلق أو التقصير)', 'For men: (shaving or trimming)');
+  static const tahallulSubtitle = Tx('بقيت خطوة أخيرة، وبعدها تكون قد أتممت عمرتك بإذن\nالله 🤍', 'One last step — then your Umrah is complete, by Allah\'s grace ❤️');
+  static const tahallulMenHeader = Tx('**للرجل:** (الحلق أو التقصير)', 'For men: (shaving or trimming)');
   static const tahallulMenBody = Tx(
     'احلق شعرك أو قصّره للتحلل من العمرة.\nالحلق أفضل، ويجوز التقصير.',
     'Shave or trim your hair to exit Ihram. Shaving is better, trimming is permitted.',
   );
-  static const tahallulWomenHeader = Tx('للمرأة: (التقصير)', 'For women: (trimming)');
+  static const tahallulWomenHeader = Tx('**للمرأة:** (التقصير)', 'For women: (trimming)');
   static const tahallulWomenBody = Tx(
-    'قصّري قدرًا يسيرًا من أطراف شعرك\nللتحلل من العمرة.',
+    'قصّري قدرًا يسيرًا من أطراف شعرك للتحلل\nمن العمرة.',
     'Trim a small amount from the ends of your hair to exit Ihram.',
   );
-  static const tahallulNote = Tx('❤️ بعد التحلل، تنتهي أعمال العمرة.', '❤️ After Tahallul, the rites of Umrah are complete.');
+  static const tahallulNote = Tx('بعد التحلل، تنتهي أعمال العمرة. 🤍', '❤️ After Tahallul, the rites of Umrah are complete.');
   static const tahallulButton = Tx('تم التحلل', 'Tahallul done');
 
   // الحمدلله، أتممت نسكك
@@ -95,9 +95,9 @@ abstract final class SaeeStepsText {
   static const completeTitle = Tx('الحمدلله، أتممت نسكك', 'Praise Allah, you completed your rite');
   static const completeSubtitle = Tx('تقبّل الله منك، وكتب لك الأجر والقبول.', 'May Allah accept from you and reward you.');
   static const completeHeadline = Tx('الحمدلله على تمام النعمة', 'All praise to Allah for completing this blessing');
-  static const completeSubHeadline = Tx('لقد أتممت نسكك بنجاح، تقبّل الله منك', 'You have completed your rite, may Allah accept from you');
+  static const completeSubHeadline = Tx('لقد أتممت نسكك بنجاح تقبّل الله منك', 'You have completed your rite, may Allah accept from you');
   static const completeDua = Tx(
-    '«الحَمْدُ لِلَّهِ الَّذِي بِنِعْمَتِهِ تَتِمُّ الصَّالِحَاتُ.. اللَّهُمَّ تَقَبَّلْ مِنَّا عُمْرَتَنَا،\nوَاغْفِرْ لَنَا ذُنُوبَنَا، وَاجْعَلْ سَعْيَنَا مَشْكُورًا، وَذَنْبَنَا مَغْفُورًا،\nوَعَمَلَنَا صَالِحًا مَقْبُولًا. اللَّهُمَّ اجْعَلْهَا عُمْرَةً مُبَارَكَةً تُغَسِّلُ\nبِهَا سَيِّئَاتِنَا، وَتَرْفَعُ بِهَا دَرَجَاتِنَا، وَتَرُدَّنَا إِلَى بِلَادِنَا\nسَالِمِينَ غَانِمِينَ. آمِينَ.»',
+    '«الْحَمْدُ لِلَّهِ الَّذِي بِنِعْمَتِهِ تَتِمُّ الصَّالِحَاتُ.. اللَّهُمَّ تَقَبَّلْ مِنَّا\nعُمْرَتَنَا، وَاغْفِرْ لَنَا ذُنُوبَنَا، وَاجْعَلْ سَعْيَنَا مَشْكُورًا، وَذَنْبَنَا مَغْفُورًا،\nوَعَمَلَنَا صَالِحًا مَقْبُولاً.. اللَّهُمَّ اجْعَلْهَا عُمْرَةً مُبَارَكَةً تَغْسِلُ بِهَا\nسَيِّئَاتِنَا، وَتَرْفَعُ بِهَا دَرَجَاتِنَا، وَأَعِدْنَا إِلَى بِلَادِنَا سَالِمِينَ غَانِمِينَ..\nآمِينَ».',
     '«All praise is for Allah, by whose grace good deeds are completed. O Allah, accept our Umrah, forgive our sins, make our effort rewarded, our sin forgiven, and our deeds righteous and accepted. O Allah, make it a blessed Umrah that washes our wrongs, raises our ranks, and returns us to our lands safe and blessed. Amen.»',
   );
   static const completeButton = Tx('إنهاء الرحلة', 'End the journey');

@@ -35,7 +35,7 @@ class SaeeCompleteScreen extends StatelessWidget {
           height: 38,
           dy: 0,
           align: TextAlign.center,
-          style: c.style(24, FigmaWeight.sfBold, TawafColors.green, lineHeight: null, letterSpacing: 0),
+          style: c.style(30, FigmaWeight.sfBold, TawafColors.green, lineHeight: null, letterSpacing: 0),
         ),
 
         c.text(
@@ -46,7 +46,7 @@ class SaeeCompleteScreen extends StatelessWidget {
           height: 22,
           dy: 0,
           align: TextAlign.center,
-          style: c.style(14, FigmaWeight.semiBold, TawafColors.accent, lineHeight: null, letterSpacing: 0),
+          style: c.style(18, FigmaWeight.semiBold, TawafColors.green, lineHeight: null, letterSpacing: 0),
         ),
 
         c.rect(
@@ -65,7 +65,7 @@ class SaeeCompleteScreen extends StatelessWidget {
           c,
           SaeeStepsText.completeDua(),
           const TawafTextBox(17, 494, 360),
-          c.style(13, FigmaWeight.sfRegular, TawafColors.green, lineHeight: 22, letterSpacing: 0),
+          c.style(14, FigmaWeight.sfRegular, TawafColors.green, lineHeight: 22, letterSpacing: 0),
           maxHeight: 130,
         ),
 
