@@ -3,60 +3,105 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/theme/figma_text.dart';
 import '../../../../core/utils/figma_canvas.dart';
+import '../../../../core/widgets/figma_lines.dart';
 import '../../../../core/widgets/figma_page.dart';
 import '../../domain/entities/company_group.dart';
+import '../../domain/entities/company_member.dart';
+import '../../domain/entities/company_trip.dart';
 import '../../domain/repositories/company_repository.dart';
 import '../controllers/company_controller.dart';
-import '../l10n/company_forms_text.dart';
 import '../l10n/company_groups_text.dart';
+import '../widgets/company_box.dart';
 import '../widgets/company_colors.dart';
+import '../widgets/company_group_card.dart';
 
 // -------------------------------------------------------------
-// "تفاصيل المجموعة" — Figma تفاصيل المجموعة (393×852) → FigmaPage
-// كرت بيانات المجموعة (تيل) + رمز الانضمام (المعتمر بيدخله أو بيمسحه حتى ينضم — اضغط للنسخ)
-// + المشرف + شريط الإجراءات (أعضاء / محادثة / المشرف)
-// بترجع true للي فتحها لو تغيّر إشي (عضو أو مشرف) حتى يحدّث القوائم
+// "تفاصيل المجموعة" — مطابقة لـ Figma 630:4039 (فيها مشرف) / 748:3815 (بلا مشرف ولا أعضاء)
+// كرت المجموعة 120 ← "تاريخ الرحلة" و"المعتمرون" ← "عرض جميع الاعضاء" (أو "إضافة اعضاء مجموعة")
+// ← "رؤية الدردشة" و"تغيير المشرف" (السهم بيفتح قائمة مشرفي الشركة تحته — Group 82) ← "ملاحظات إضافية"
+// تحتهم رمز الانضمام اللي بيدخله المعتمر (مش بـ Figma — اضغط للنسخ)
+// بترجع true للي فتحها لو تغيّر إشي حتى يحدّث القوائم والأرقام
 // -------------------------------------------------------------
 class CompanyGroupDetailScreen extends StatefulWidget {
   final CompanyGroup group;
   final CompanyRepository repository;
+  final CompanyTrip? trip;
 
-  const CompanyGroupDetailScreen({super.key, required this.group, required this.repository});
+  const CompanyGroupDetailScreen({super.key, required this.group, required this.repository, this.trip});
 
   @override
   State<CompanyGroupDetailScreen> createState() => _CompanyGroupDetailScreenState();
 }
 
 class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
-  static const _teal = Color(0xFF4C7A75);
-
   late CompanyGroup _group = widget.group;
   bool _changed = false;
 
-  Future<void> _members() async {
-    final added = await CompanyController.openMembers(context, widget.repository, _group);
-    if (added) _changed = true;
-  }
+  /// قائمة المشرفين المفتوحة تحت كرت "تغيير المشرف" (null = مسكّرة)
+  List<CompanySupervisor>? _menu;
+  bool _assigning = false;
 
-  Future<void> _supervisor() async {
-    final updated = await CompanyController.assignSupervisor(context, widget.repository, _group);
-    if (updated != null && mounted) {
+  Future<void> _members() async {
+    final count = await CompanyController.openMembers(context, widget.repository, _group);
+    if (count != null && mounted) {
       setState(() {
-        _group = updated.tripName.isEmpty ? _group.copyWith(supervisorName: updated.supervisorName, memberCount: updated.memberCount) : updated;
+        _group = _group.copyWith(memberCount: count);
         _changed = true;
       });
     }
   }
 
+  Future<void> _toggleMenu() async {
+    if (_menu != null) return setState(() => _menu = null);
+    try {
+      final roster = await widget.repository.supervisors();
+      if (!mounted) return;
+      // الشركة لسا ما عندها مشرفين: مباشرة لصفحة "إضافة مشرف جديد"
+      if (roster.isEmpty) return await _addNewSupervisor();
+      setState(() => _menu = roster);
+    } catch (e) {
+      if (mounted) CompanyController.showError(context, e);
+    }
+  }
+
+  Future<void> _assign(CompanySupervisor supervisor) async {
+    setState(() {
+      _menu = null;
+      _assigning = true;
+    });
+    try {
+      final updated = await widget.repository.assignSupervisor(_group.id, supervisor.email);
+      if (!mounted) return;
+      setState(() {
+        _group = _group.copyWith(supervisorName: updated.supervisorName ?? supervisor.name, memberCount: updated.memberCount);
+        _changed = true;
+      });
+    } catch (e) {
+      if (mounted) CompanyController.showError(context, e);
+    } finally {
+      if (mounted) setState(() => _assigning = false);
+    }
+  }
+
+  Future<void> _addNewSupervisor() async {
+    setState(() => _menu = null);
+    final added = await CompanyController.openAddSupervisor(context, widget.repository);
+    if (added != null && mounted) await _assign(added);
+  }
+
   void _copyCode() {
     if (_group.joinCode.isEmpty) return;
     Clipboard.setData(ClipboardData(text: _group.joinCode));
-    CompanyController.showMessage(context, CompanyFormsText.codeCopied());
+    CompanyController.showMessage(context, CompanyGroupsText.codeCopied());
   }
 
   @override
   Widget build(BuildContext context) {
     final group = _group;
+    final green = CompanyColors.green;
+    final date = widget.trip?.departureDate;
+    final hasSupervisor = group.supervisorName != null;
+    final menu = _menu;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -67,46 +112,89 @@ class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
         titleRight: 349,
         chevronLeft: 367,
         body: (c) => [
-          // ── كرت بيانات المجموعة (تيل) ──
-          c.box(left: 16, top: 113, width: 361, height: 188, radius: 16, color: _teal),
-          c.box(left: 161.5, top: 133, width: 70, height: 70, radius: 12, color: CompanyColors.cardInset),
-          c.rect(left: 161.5, top: 133, width: 70, height: 70, child: Icon(Icons.group_rounded, size: c.s.x(38), color: _teal)),
-          c.text(group.name, left: 16, top: 219, width: 361, height: 26, align: TextAlign.center, dy: 0, style: c.style(18, FigmaWeight.sfBold, Colors.white, lineHeight: null, letterSpacing: 0)),
-          c.text(group.tripName, left: 16, top: 251, width: 361, height: 22, align: TextAlign.center, dy: 0, style: c.style(14, FigmaWeight.sfRegular, Colors.white.withValues(alpha: 0.8), lineHeight: null, letterSpacing: 0)),
-          c.text('${group.memberCount} ${CompanyGroupsText.memberCount()}', left: 16, top: 278, width: 361, height: 22, align: TextAlign.center, dy: 0, style: c.style(13, FigmaWeight.sfRegular, Colors.white.withValues(alpha: 0.8), lineHeight: null, letterSpacing: 0)),
+          ...CompanyGroupCard.build(c, group, top: 125, withLink: false),
 
-          // ── رمز الانضمام (اضغط للنسخ) ──
-          c.box(left: 16, top: 317, width: 361, height: 64, radius: 14, color: CompanyColors.card),
-          c.text(CompanyFormsText.joinCode(), left: 120, top: 327, width: 241, height: 20, align: TextAlign.start, dy: 0, style: c.style(13, FigmaWeight.sfRegular, CompanyColors.secondaryLabel, lineHeight: null, letterSpacing: 0)),
-          c.text(group.joinCode, left: 120, top: 348, width: 241, height: 26, align: TextAlign.start, dy: 0, style: c.style(20, FigmaWeight.sfBold, CompanyColors.green, lineHeight: null, letterSpacing: 2)),
-          c.rect(left: 32, top: 329, width: 40, height: 40, child: Icon(Icons.copy_rounded, size: c.s.x(22), color: _teal)),
-          c.tapArea(left: 16, top: 317, width: 361, height: 64, onTap: _copyCode),
+          // تاريخ الرحلة / المعتمرون
+          ..._stat(c, left: 206, icon: 'ic_create_trip', iconLeft: 336, label: CompanyGroupsText.tripDate(), labelRight: 322, value: date == null ? '—' : '${date.day}/${date.month}/${date.year}', valueRight: 328),
+          ..._stat(c, left: 19, icon: 'ic_groups', iconLeft: 149, label: CompanyGroupsText.pilgrims(), labelRight: 141, value: '${group.memberCount}', valueRight: 122),
 
-          // ── المشرف ──
-          c.text(
-            group.supervisorName == null ? CompanyFormsText.noSupervisor() : CompanyFormsText.supervisorLine(group.supervisorName!),
+          // عرض جميع الاعضاء (أو إضافة لو فاضية)
+          companyBox(c, left: 16, top: 350, width: 361, height: 53, radius: 10, color: CompanyColors.statCard, shadow: CompanyColors.greenShadow),
+          c.rect(
             left: 16,
-            top: 393,
+            top: 350,
             width: 361,
-            height: 22,
-            align: TextAlign.start,
-            dy: 0,
-            style: c.style(14, FigmaWeight.semiBold, group.supervisorName == null ? const Color(0xFFD32F2F) : CompanyColors.green, lineHeight: null, letterSpacing: 0),
+            height: 53,
+            child: IgnorePointer(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset('$companyAssets/ic_groups.png', width: c.s.x(24), height: c.s.x(24), color: green),
+                  SizedBox(width: c.s.x(8)),
+                  Text(group.memberCount == 0 ? CompanyGroupsText.addMembers() : CompanyGroupsText.allMembers(), style: c.style(14, FigmaWeight.semiBold, green, lineHeight: null, letterSpacing: 0)),
+                ],
+              ),
+            ),
           ),
+          c.tapArea(left: 16, top: 350, width: 361, height: 53, onTap: _members),
 
-          // ── شريط الإجراءات ──
-          ..._actionBtn(c, icon: Icons.people_rounded, label: CompanyGroupsText.members(), left: 288, top: 430, onTap: _members),
-          ..._actionBtn(c, icon: Icons.chat_bubble_outline_rounded, label: CompanyGroupsText.chat(), left: 155, top: 430, onTap: () => CompanyController.comingSoon(context)),
-          ..._actionBtn(c, icon: Icons.manage_accounts_outlined, label: CompanyFormsText.supervisorAction(), left: 22, top: 430, onTap: _supervisor),
+          // رؤية الدردشة
+          companyBox(c, left: 206, top: 419, width: 170.5, height: 73, color: CompanyColors.statCard, shadow: CompanyColors.greenShadow),
+          c.image('assets/images/supervisor/ic_pen.png', left: 336, top: 444, width: 24, height: 24, color: green),
+          FigmaLines.build(c, CompanyGroupsText.chat(), left: 208, top: 445, width: 120, style: c.style(14, FigmaWeight.semiBold, green), wrap: false),
+          c.tapArea(left: 206, top: 419, width: 170.5, height: 73, onTap: () => CompanyController.comingSoon(context)),
+
+          // تغيير المشرف / إضافة المشرف + السهم
+          companyBox(c, left: 19, top: 419, width: 170.5, height: 73, color: CompanyColors.statCard, shadow: CompanyColors.greenShadow),
+          c.image('$companyAssets/ic_supervisors.png', left: 149, top: 444, width: 24, height: 24, color: green),
+          FigmaLines.build(c, hasSupervisor ? CompanyGroupsText.changeSupervisor() : CompanyGroupsText.addSupervisor(), left: 50, top: 445, width: 91, style: c.style(14, FigmaWeight.semiBold, green), wrap: false),
+          c.rect(
+            left: 30,
+            top: 444,
+            width: 24,
+            height: 24,
+            child: _assigning
+                ? Padding(padding: EdgeInsets.all(c.s.x(3)), child: CircularProgressIndicator(strokeWidth: 2, color: green))
+                : Icon(menu == null ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded, size: c.s.x(24), color: green),
+          ),
+          c.tapArea(left: 19, top: 419, width: 170.5, height: 73, onTap: _assigning ? () {} : _toggleMenu),
+
+          // ملاحظات إضافية
+          FigmaLines.build(c, CompanyGroupsText.notes(), left: 200, top: 516, width: 171, style: c.style(14, FigmaWeight.semiBold, green), wrap: false),
+          companyBox(c, left: 16, top: 546, width: 361, height: 74, radius: 10, color: Colors.white, borderColor: const Color(0xFFE5E5EA)),
+          FigmaLines.build(c, CompanyGroupsText.noNotes(), left: 32, top: 562, width: 329, style: c.style(13, FigmaWeight.sfRegular, CompanyColors.secondaryLabel), wrap: false),
+
+          // رمز الانضمام
+          if (group.joinCode.isNotEmpty) ...[
+            companyBox(c, left: 16, top: 640, width: 361, height: 64, radius: 10, color: CompanyColors.card, shadow: CompanyColors.shadow),
+            FigmaLines.build(c, CompanyGroupsText.joinCode(), left: 120, top: 650, width: 241, style: c.style(12, FigmaWeight.sfRegular, CompanyColors.secondaryLabel), wrap: false),
+            FigmaLines.build(c, group.joinCode, left: 120, top: 672, width: 241, style: c.style(18, FigmaWeight.sfBold, green, letterSpacing: 2), wrap: false),
+            c.rect(left: 32, top: 660, width: 24, height: 24, child: Icon(Icons.copy_rounded, size: c.s.x(22), color: const Color(0xFF4C7A75))),
+            c.tapArea(left: 16, top: 640, width: 361, height: 64, onTap: _copyCode),
+          ],
+
+          // قائمة المشرفين (Group 82: صفوف 145×36 تحت السهم) — فوق الملاحظات
+          if (menu != null) ...[
+            c.tapArea(left: 0, top: 59, width: 393, height: 800, onTap: () => setState(() => _menu = null)),
+            for (final (i, s) in [...menu.map((s) => (s.name, () => _assign(s))), ('+ ${CompanyGroupsText.addSupervisor()}', _addNewSupervisor)].indexed) ...[
+              companyBox(c, left: 30, top: 498 + i * 35.0, width: 145, height: 36, radius: 6, color: Colors.white, borderColor: green.withValues(alpha: 0.3), shadow: CompanyColors.shadow),
+              FigmaLines.build(c, s.$1, left: 36, top: 505 + i * 35.0, width: 133, align: TextAlign.center, style: c.style(13, FigmaWeight.sfRegular, green), wrap: false),
+              c.tapArea(left: 30, top: 498 + i * 35.0, width: 145, height: 36, onTap: s.$2),
+            ],
+          ],
         ],
       ),
     );
   }
 
-  List<Widget> _actionBtn(FigmaCanvas c, {required IconData icon, required String label, required double left, required double top, required VoidCallback onTap}) => [
-        c.box(left: left, top: top, width: 83, height: 83, radius: 14, color: CompanyColors.card),
-        c.rect(left: left, top: top + 12, width: 83, height: 32, child: Icon(icon, size: c.s.x(30), color: _teal)),
-        c.text(label, left: left, top: top + 50, width: 83, height: 30, align: TextAlign.center, dy: 0, style: c.style(12, FigmaWeight.sfRegular, CompanyColors.green, lineHeight: null, letterSpacing: 0)),
-        c.tapArea(left: left, top: top, width: 83, height: 83, onTap: onTap),
-      ];
+  // كرت رقم (170.5×73 من y261): الأيقونة، العنوان (طرفه [labelRight] y278) والقيمة (طرفها [valueRight] y304)
+  List<Widget> _stat(FigmaCanvas c, {required double left, required String icon, required double iconLeft, required String label, required double labelRight, required String value, required double valueRight}) {
+    final green = CompanyColors.green;
+    return [
+      companyBox(c, left: left, top: 261, width: 170.5, height: 73, color: CompanyColors.statCard, shadow: CompanyColors.greenShadow),
+      c.image('$companyAssets/$icon.png', left: iconLeft, top: 277, width: 24, height: 24, color: green),
+      FigmaLines.build(c, label, left: labelRight - 120, top: 278, width: 120, style: c.style(14, FigmaWeight.semiBold, green), wrap: false),
+      FigmaLines.build(c, value, left: valueRight - 120, top: 304, width: 120, style: c.style(16, FigmaWeight.semiBold, green), wrap: false),
+    ];
+  }
 }

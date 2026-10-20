@@ -7,6 +7,7 @@ import '../../domain/repositories/company_repository.dart';
 import '../controllers/company_controller.dart';
 import '../cubits/company_groups_cubit.dart';
 import '../cubits/company_home_cubit.dart';
+import '../cubits/company_profile_cubit.dart';
 import '../cubits/company_trips_cubit.dart';
 import '../widgets/company_tab_bar.dart';
 import 'company_groups_screen.dart';
@@ -32,6 +33,7 @@ class _CompanyShellState extends State<CompanyShell> {
   late final _home = CompanyHomeCubit(_repository)..load();
   late final _trips = CompanyTripsCubit(_repository)..load();
   late final _groups = CompanyGroupsCubit(_repository)..load();
+  late final _profile = CompanyProfileCubit(_repository)..load();
 
   var _tab = CompanyTab.home;
   final _built = <CompanyTab>{CompanyTab.home};
@@ -61,7 +63,7 @@ class _CompanyShellState extends State<CompanyShell> {
         case CompanyTab.groups:
           _groups.load();
         case CompanyTab.profile:
-          break;
+          _profile.load();
       }
     }
     setState(() {
@@ -75,6 +77,7 @@ class _CompanyShellState extends State<CompanyShell> {
     _home.close();
     _trips.close();
     _groups.close();
+    _profile.close();
     super.dispose();
   }
 
@@ -84,7 +87,7 @@ class _CompanyShellState extends State<CompanyShell> {
     return RepositoryProvider.value(
       value: _repository,
       child: MultiBlocProvider(
-        providers: [BlocProvider.value(value: _home), BlocProvider.value(value: _trips), BlocProvider.value(value: _groups)],
+        providers: [BlocProvider.value(value: _home), BlocProvider.value(value: _trips), BlocProvider.value(value: _groups), BlocProvider.value(value: _profile)],
         child: Scaffold(
           backgroundColor: Colors.white,
           resizeToAvoidBottomInset: false,

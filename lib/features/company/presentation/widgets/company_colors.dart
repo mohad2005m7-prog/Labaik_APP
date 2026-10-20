@@ -30,6 +30,9 @@ abstract final class CompanyColors {
   static const navFill = Color(0xF0F5F5F5);
   static const navHairline = Color(0x4D000000);
 
+  /// شارة "غير مكتملة" (المجموعة بلا مشرف)
+  static const incomplete = Color(0xFF4C7A75);
+
   static const shadow = Color(0x40000000);
   static const greenShadow = Color(0x401F3B2E);
 }

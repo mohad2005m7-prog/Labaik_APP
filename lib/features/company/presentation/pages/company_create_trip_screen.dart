@@ -29,8 +29,9 @@ class CompanyCreateTripScreen extends StatefulWidget {
 
   /// "مكة المكرمة، المدينة المنورة" أو بفاصلة إنجليزية → قائمة
   static List<String> splitDestinations(String text) => [
-        for (final d in text.split(RegExp(r'[,،\n]'))) if (d.trim().isNotEmpty) d.trim(),
-      ];
+    for (final d in text.split(RegExp(r'[,،\n]')))
+      if (d.trim().isNotEmpty) d.trim(),
+  ];
 
   @override
   State<CompanyCreateTripScreen> createState() => _CompanyCreateTripScreenState();
@@ -68,11 +69,18 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(height: s.x(8)),
-              Container(width: s.x(36), height: s.x(4), decoration: BoxDecoration(color: const Color(0xFFE0E0E0), borderRadius: BorderRadius.circular(s.x(2)))),
+              Container(
+                width: s.x(36),
+                height: s.x(4),
+                decoration: BoxDecoration(color: const Color(0xFFE0E0E0), borderRadius: BorderRadius.circular(s.x(2))),
+              ),
               SizedBox(height: s.x(8)),
               for (final (i, label) in types.indexed)
                 ListTile(
-                  title: Text(label, style: TextStyle(fontSize: s.x(16), color: _tripTypeIndex == i ? CompanyColors.green : Colors.black87, fontWeight: _tripTypeIndex == i ? FontWeight.bold : FontWeight.normal)),
+                  title: Text(
+                    label,
+                    style: TextStyle(fontSize: s.x(16), color: _tripTypeIndex == i ? CompanyColors.green : Colors.black87, fontWeight: _tripTypeIndex == i ? FontWeight.bold : FontWeight.normal),
+                  ),
                   trailing: _tripTypeIndex == i ? Icon(Icons.check_rounded, color: CompanyColors.green, size: s.x(22)) : null,
                   onTap: () {
                     setState(() => _tripTypeIndex = i);
@@ -90,12 +98,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
   Future<void> _pickDate(bool departure) async {
     final now = DateTime.now();
     final initial = departure ? (_departureDate ?? now.add(const Duration(days: 30))) : (_returnDate ?? (_departureDate ?? now).add(const Duration(days: 14)));
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: now,
-      lastDate: DateTime(now.year + 5),
-    );
+    final picked = await showDatePicker(context: context, initialDate: initial, firstDate: now, lastDate: DateTime(now.year + 5));
     if (picked != null && mounted) {
       setState(() {
         if (departure) {
@@ -121,16 +124,18 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
     }
     setState(() => _busy = true);
     try {
-      await widget.repository.createTrip(TripDraft(
-        kind: _tripTypeIndex == 1 ? PilgrimageKind.hajj : PilgrimageKind.umrah,
-        name: _name.text,
-        destinations: destinations,
-        departureDate: departure,
-        returnDate: _returnDate,
-        departurePlace: _departurePoint.text,
-        expectedPilgrims: count,
-        notes: _notes.text,
-      ));
+      await widget.repository.createTrip(
+        TripDraft(
+          kind: _tripTypeIndex == 1 ? PilgrimageKind.hajj : PilgrimageKind.umrah,
+          name: _name.text,
+          destinations: destinations,
+          departureDate: departure,
+          returnDate: _returnDate,
+          departurePlace: _departurePoint.text,
+          expectedPilgrims: count,
+          notes: _notes.text,
+        ),
+      );
       if (!mounted) return;
       setState(() => _busy = false);
       _showSuccess();
@@ -175,16 +180,8 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
       body: (c) {
         final s = c.s;
 
-        Widget label(String text, double top) => c.text(
-              text,
-              left: 16,
-              top: top,
-              width: 361,
-              height: 22,
-              align: TextAlign.start,
-              dy: 0,
-              style: c.style(13, FigmaWeight.sfRegular, CompanyColors.green, lineHeight: null, letterSpacing: 0),
-            );
+        Widget label(String text, double top) =>
+            c.text(text, left: 16, top: top, width: 361, height: 22, align: TextAlign.start, dy: 0, style: c.style(13, FigmaWeight.sfRegular, CompanyColors.green, lineHeight: null, letterSpacing: 0));
 
         Widget textField(TextEditingController ctrl, String hint, double top, {TextInputType? keyboard, bool multiline = false}) {
           return c.rect(
@@ -264,20 +261,30 @@ class _FormField extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = figmaText(s, size: 14, weight: FigmaWeight.sfRegular, color: CompanyColors.green, lineHeight: null, letterSpacing: 0);
     return DecoratedBox(
-      decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(s.x(12)), border: Border.all(color: _border, width: s.x(1))),
+      decoration: BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.circular(s.x(12)),
+        border: Border.all(color: _border, width: s.x(1)),
+      ),
       child: Padding(
         padding: EdgeInsetsDirectional.fromSTEB(s.x(16), multiline ? s.x(12) : 0, s.x(16), multiline ? s.x(12) : 0),
-        child: TextField(
-          controller: controller,
-          keyboardType: multiline ? TextInputType.multiline : keyboard,
-          maxLines: multiline ? null : 1,
-          textInputAction: multiline ? TextInputAction.newline : TextInputAction.next,
-          textAlignVertical: multiline ? TextAlignVertical.top : TextAlignVertical.center,
-          cursorColor: CompanyColors.green,
-          inputFormatters: keyboard == TextInputType.number ? [FilteringTextInputFormatter.digitsOnly] : null,
-          style: style,
-          decoration: InputDecoration.collapsed(hintText: hint, hintStyle: style.copyWith(color: CompanyColors.secondaryLabel)),
-          onTapOutside: (_) => FocusScope.of(context).unfocus(),
+        child: Align(
+          alignment: multiline ? AlignmentDirectional.topStart : AlignmentDirectional.centerStart,
+          child: TextField(
+            controller: controller,
+            keyboardType: multiline ? TextInputType.multiline : keyboard,
+            maxLines: multiline ? null : 1,
+            textInputAction: multiline ? TextInputAction.newline : TextInputAction.next,
+            textAlignVertical: multiline ? TextAlignVertical.top : TextAlignVertical.center,
+            cursorColor: CompanyColors.green,
+            inputFormatters: keyboard == TextInputType.number ? [FilteringTextInputFormatter.digitsOnly] : null,
+            style: style,
+            decoration: InputDecoration.collapsed(
+              hintText: hint,
+              hintStyle: style.copyWith(color: CompanyColors.secondaryLabel),
+            ),
+            onTapOutside: (_) => FocusScope.of(context).unfocus(),
+          ),
         ),
       ),
     );
@@ -303,12 +310,18 @@ class _DropdownField extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: DecoratedBox(
-        decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(s.x(12)), border: Border.all(color: _border, width: s.x(1))),
+        decoration: BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.circular(s.x(12)),
+          border: Border.all(color: _border, width: s.x(1)),
+        ),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: s.x(16)),
           child: Row(
             children: [
-              Expanded(child: Text(value, style: style, overflow: TextOverflow.ellipsis, maxLines: 1)),
+              Expanded(
+                child: Text(value, style: style, overflow: TextOverflow.ellipsis, maxLines: 1),
+              ),
               Icon(Icons.keyboard_arrow_down_rounded, size: s.x(22), color: CompanyColors.green),
             ],
           ),
@@ -339,12 +352,18 @@ class _DateField extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: DecoratedBox(
-        decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(s.x(12)), border: Border.all(color: _border, width: s.x(1))),
+        decoration: BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.circular(s.x(12)),
+          border: Border.all(color: _border, width: s.x(1)),
+        ),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: s.x(16)),
           child: Row(
             children: [
-              Expanded(child: Text(hasDate ? SupFormat.date(date!) : hint, style: style, overflow: TextOverflow.ellipsis, maxLines: 1)),
+              Expanded(
+                child: Text(hasDate ? SupFormat.date(date!) : hint, style: style, overflow: TextOverflow.ellipsis, maxLines: 1),
+              ),
               Icon(Icons.keyboard_arrow_down_rounded, size: s.x(22), color: CompanyColors.green),
             ],
           ),
@@ -405,7 +424,9 @@ class _Busy extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
-        decoration: BoxDecoration(color: CompanyColors.green, borderRadius: BorderRadius.circular(12)),
-        child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))),
-      );
+    decoration: BoxDecoration(color: CompanyColors.green, borderRadius: BorderRadius.circular(12)),
+    child: const Center(
+      child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white)),
+    ),
+  );
 }

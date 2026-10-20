@@ -3,6 +3,7 @@ import '../../../supervisor/presentation/widgets/supervisor_format.dart';
 import '../../domain/entities/company_group.dart';
 import '../../domain/entities/company_member.dart';
 import '../../domain/entities/company_notification.dart';
+import '../../domain/entities/company_profile.dart';
 import '../../domain/entities/company_trip.dart';
 import '../../presentation/l10n/company_notifications_text.dart';
 
@@ -76,6 +77,33 @@ abstract final class CompanyJson {
         memberCount: j.optionalInt('pilgrimCount') ?? 0,
         status: trip != null && trip.endedOn(today ?? DateTime.now()) ? CompanyGroupStatus.ended : CompanyGroupStatus.active,
       );
+
+  static CompanyProfile profile(Map<String, dynamic> j) => CompanyProfile(
+        id: _str(j, 'id'),
+        name: _str(j, 'name'),
+        logoUrl: _opt(j, 'logoUrl'),
+        licenseNumber: _str(j, 'commercialRegistrationNumber'),
+        country: _opt(j, 'country'),
+        city: _opt(j, 'city'),
+        email: _opt(j, 'officialEmail'),
+        phone: _opt(j, 'primaryPhone'),
+        contactName: _str(j, 'contactFullName'),
+      );
+
+  /// UpdateMyCompanyCommand — الفاضي بيروح null
+  static Map<String, dynamic> profileBody(CompanyProfile p) {
+    String? opt(String? v) => v == null || v.trim().isEmpty ? null : v.trim();
+    return {
+      'name': p.name.trim(),
+      'commercialRegistrationNumber': p.licenseNumber.trim(),
+      'contactFullName': p.contactName.trim(),
+      'logoUrl': opt(p.logoUrl),
+      'country': opt(p.country),
+      'city': opt(p.city),
+      'officialEmail': opt(p.email),
+      'primaryPhone': opt(p.phone),
+    };
+  }
 
   static CompanyMember member(Map<String, dynamic> j) => CompanyMember(
         userId: _str(j, 'userId'),

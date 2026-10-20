@@ -2,6 +2,7 @@ import '../entities/company_group.dart';
 import '../entities/company_member.dart';
 import '../entities/company_notification.dart';
 import '../entities/company_overview.dart';
+import '../entities/company_profile.dart';
 import '../entities/company_trip.dart';
 
 // -------------------------------------------------------------
@@ -9,6 +10,12 @@ import '../entities/company_trip.dart';
 // -------------------------------------------------------------
 abstract class CompanyRepository {
   Future<CompanyOverview> overview();
+
+  /// بيانات الشركة (GET /company/me)
+  Future<CompanyProfile> profile();
+
+  /// حفظ بيانات الشركة (PUT /company/me — استبدال كامل) وبترجع المحفوظ
+  Future<CompanyProfile> updateProfile(CompanyProfile profile);
 
   /// كل رحلات الشركة (الفلترة "القادمة" / "الراحلة" والبحث بالشاشة)
   Future<List<CompanyTrip>> trips();
@@ -32,6 +39,9 @@ abstract class CompanyRepository {
 
   /// إضافة معتمر بالإيميل — لو مش مسجّل السيرفر بينشئ حسابه ويبعتله كلمة مؤقتة
   Future<CompanyGroup> addMember(String groupId, {required String email, String? fullName, String? phone});
+
+  /// حذف معتمر من المجموعة
+  Future<void> removeMember(String groupId, String userId);
 
   /// قائمة مشرفي الشركة
   Future<List<CompanySupervisor>> supervisors();

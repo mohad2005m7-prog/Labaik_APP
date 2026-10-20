@@ -1,40 +1,94 @@
 import '../../../../core/l10n/tx.dart';
 
-/// نصوص شاشات الملف الشخصي للشركة: البروفايل، الإعدادات، بيانات الشركة، معلومات التواصل
+/// نصوص الملف الشخصي للشركة وشاشاته (Figma 27.Profile 618:3451، تعديل بيانات الشركة 633:3772،
+/// معلومات التواصل 672:4061، إدارة المشرفين 672:4107، إضافة مشرف 681:4159، المساعدة 698:4428، الإعدادات 685:4306)
 abstract final class CompanyProfileText {
-  // تبويب الملف الشخصي (27.Profile)
-  static const accountData = Tx('بيانات الحساب', 'Account Data');
-  static const accountSettings = Tx('إعدادات الحساب', 'Account Settings');
-  static const companyData = Tx('بيانات الشركة', 'Company Data');
-  static const contactInfo = Tx('معلومات التواصل', 'Contact Info');
-  static const settings = Tx('الإعدادات', 'Settings');
+  // الملف الشخصي
+  static const title = Tx('ملفي الشخصي', 'My Profile');
+  static const active = Tx('الحساب مفعّل', 'Account active');
+  static const companyData = Tx('بيانات الشركة', 'Company data');
+  static const licenseNumber = Tx('رقم الترخيص:', 'License No.:');
+  static const country = Tx('الدولة:', 'Country:');
+  static const city = Tx('المدينة', 'City');
+  static const accountManagement = Tx('إدارة الحساب', 'Account management');
+  static const contactInfo = Tx('معلومات التواصل', 'Contact information');
+  static const supervisors = Tx('إدارة المشرفين', 'Manage supervisors');
+  static const help = Tx('المساعدة والدعم', 'Help & support');
+  static const loadFailed = Tx('تعذّر تحميل بيانات الشركة — اضغط للمحاولة مرة أخرى', "Couldn't load the company data — tap to retry");
 
-  // بيانات الشركة (FigmaPage)
-  static const companyDataTitle = Tx('بيانات الشركة', 'Company Data');
+  // تعديل بيانات الشركة
+  static const editTitle = Tx('تعديل بيانات الشركة', 'Edit Company Data');
   static const companyName = Tx('اسم الشركة :', 'Company name:');
-  static const licenseNumber = Tx('رقم الترخيص :', 'License number:');
-  static const address = Tx('العنوان :', 'Address:');
-  static const companyNameHint = Tx('أدخل اسم الشركة', 'Enter company name');
-  static const licenseNumberHint = Tx('أدخل رقم الترخيص', 'Enter license number');
-  static const addressHint = Tx('أدخل عنوان الشركة', 'Enter company address');
-  static const saveButton = Tx('حفظ', 'Save');
+  static const companyNameHint = Tx('شركة الهدى للحج والعمرة', 'Al Huda Hajj & Umrah');
+  static const logo = Tx('شعار الشركة', 'Company logo');
+  static const licenseLabel = Tx('رقم الترخيص :', 'License number:');
+  static const licenseHint = Tx('LAB-2026-014', 'LAB-2026-014');
+  static const countryLabel = Tx('الدولة :', 'Country:');
+  static const countryHint = Tx('اختار الدولة', 'Choose the country');
+  static const cityLabel = Tx('المدينة', 'City');
+  static const cityHint = Tx('اكتب المدينة', 'Enter the city');
+  static const save = Tx('حفظ التعديلات', 'Save changes');
+  static const saved = Tx('تم حفظ التعديلات', 'Changes saved');
+  static const required = Tx('اسم الشركة ورقم الترخيص واسم المسؤول مطلوبين', 'Company name, license number and contact name are required');
+  static const licenseTaken = Tx('رقم الترخيص مستخدم لشركة ثانية', 'This license number is used by another company');
+  static const logoSoon = Tx('رفع الشعار بيشتغل لما يضيف السيرفر رفع الملفات', 'Logo upload works once the server supports file uploads');
 
-  // معلومات التواصل (FigmaPage)
-  static const contactTitle = Tx('معلومات التواصل', 'Contact Info');
-  static const phone = Tx('رقم الهاتف :', 'Phone number:');
-  static const email = Tx('البريد الإلكتروني :', 'Email:');
-  static const website = Tx('الموقع الإلكتروني :', 'Website:');
-  static const phoneHint = Tx('أدخل رقم الهاتف', 'Enter phone number');
-  static const emailHint = Tx('أدخل البريد الإلكتروني', 'Enter email address');
-  static const websiteHint = Tx('أدخل رابط الموقع', 'Enter website URL');
+  // معلومات التواصل
+  static const officialEmail = Tx('البريد الإلكتروني الرسمي', 'Official email');
+  static const phone = Tx('رقم الهاتف', 'Phone number');
+  static const contactName = Tx('اسم مسؤول الشركة', 'Company contact name');
+  static const emailHint = Tx('info@example.com', 'info@example.com');
+  static const phoneHint = Tx('0592222222', '0592222222');
+  static const contactNameHint = Tx('الاسم الكامل', 'Full name');
 
-  // الإعدادات (FigmaPage frameHeight:938)
+  // إدارة المشرفين
+  static const searchSupervisors = Tx('بحث عن مشرف', 'Search supervisors');
+  static const supervisorsSection = Tx('المشرفون', 'Supervisors');
+  static const showAll = Tx('عرض الكل', 'Show all');
+  static const groupSupervisor = Tx('مشرف مجموعة', 'Group supervisor');
+  static const noGroup = Tx('بلا مجموعة', 'No group');
+  static String groupsCount(int n) => n <= 1 ? groupSupervisor() : tr('مشرف $n مجموعات', 'Supervises $n groups');
+  static const noSupervisors = Tx('لا يوجد مشرفين بعد', 'No supervisors yet');
+  static const addSupervisor = Tx('إضافة مشرف', 'Add supervisor');
+
+  // إضافة مشرف جديد
+  static const addTitle = Tx('إضافة مشرف جديد', 'Add New Supervisor');
+  static const fullName = Tx('الاسم الكامل *', 'Full name *');
+  static const fullNameHint = Tx('الاسم الكامل للمشرف', "Supervisor's full name");
+  static const email = Tx('البريد الإلكتروني *', 'Email *');
+  static const supervisorEmailHint = Tx('example@email.com', 'example@email.com');
+  static const phoneRequired = Tx('رقم الهاتف *', 'Phone number *');
+  static const phoneEnter = Tx('أدخل رقم الهاتف', 'Enter the phone number');
+  static const inviteNote = Tx('سيتم إرسال دعوة إلى البريد الإلكتروني للمشرف لتفعيل حسابه وتعيين كلمة المرور.', "An invitation will be emailed to the supervisor to activate the account and set a password.");
+  static const add = Tx('إضافة المشرف', 'Add Supervisor');
+  static const added = Tx('تمت إضافة المشرف ووصلته دعوة على بريده', 'Supervisor added and invited by email');
+  static const fillAll = Tx('عبّي الاسم والبريد ورقم الهاتف', 'Fill in the name, email and phone');
+  static const invalidEmail = Tx('البريد الإلكتروني غير صحيح', 'Invalid email address');
+  static const exists = Tx('هذا المشرف موجود بقائمة الشركة، أو هو حساب الشركة نفسه', "Already on your roster, or it's the company account itself");
+
+  // المساعدة والدعم
+  static const to = Tx('إلى', 'To');
+  static const supportEmailLabel = Tx('البريد الإلكتروني لدعم لبيك', 'Labaik support email');
+  static const subject = Tx('الموضوع', 'Subject');
+  static const subjectDefault = Tx('طلب مساعدة بخصوص حساب الشركة', 'Help request about the company account');
+  static const message = Tx('نص الرسالة', 'Message');
+  static String messageDefault(Object company) => tr(
+        'مرحبًا فريق لبيك،\nنواجه مشكلة أو لدينا استفسار بخصوص حساب شركتنا، ونرجو مساعدتنا.\nنوع الطلب: تغيير كلمة المرور / مشكلة في الحساب / استفسار آخر.\nاسم الشركة: $company\nشكرًا لكم.',
+        'Hello Labaik team,\nWe have an issue or a question about our company account and would appreciate your help.\nRequest type: password change / account issue / other.\nCompany name: $company\nThank you.',
+      );
+  static const send = Tx('إرسال', 'Send');
+  static const noMailApp = Tx('ما في تطبيق بريد على الجهاز — راسلنا على', 'No mail app on this device — email us at');
+
+  // الإعدادات (Figma 12.Settings للشركة)
   static const settingsTitle = Tx('الإعدادات', 'Settings');
-  static const changePassword = Tx('تغيير كلمة المرور', 'Change Password');
-  static const notifications = Tx('الإشعارات', 'Notifications');
-  static const language = Tx('اللغة', 'Language');
-  static const about = Tx('عن التطبيق', 'About App');
-  static const privacyPolicy = Tx('سياسة الخصوصية', 'Privacy Policy');
-  static const termsOfUse = Tx('شروط الاستخدام', 'Terms of Use');
-  static const logout = Tx('تسجيل الخروج', 'Log Out');
+  static const sectionAccount = Tx('الحساب', 'Account');
+  static const editCompany = Tx('تعديل بيانات الشركة', 'Edit company data');
+  static const changePassword = Tx('تغيير كلمة المرور', 'Change password');
+  static const sectionPreferences = Tx('التفضيلات', 'Preferences');
+  static const notifications = Tx('إعدادات الإشعارات', 'Notification settings');
+  static const appLanguage = Tx('لغة التطبيق', 'App language');
+  static const sectionOther = Tx('أخرى', 'Other');
+  static const terms = Tx('الشروط والأحكام والسياسات', 'Terms & policies');
+  static const helpCenter = Tx('مركز المساعدة والدعم', 'Help & support center');
+  static const logout = Tx('تسجيل الخروج', 'Log out');
 }

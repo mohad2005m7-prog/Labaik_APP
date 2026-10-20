@@ -11,6 +11,7 @@ import 'package:labaik/features/company/data/repositories/company_repository_imp
 import 'package:labaik/features/company/data/sources/company_api.dart';
 import 'package:labaik/features/company/domain/entities/company_group.dart';
 import 'package:labaik/features/company/domain/entities/company_member.dart';
+import 'package:labaik/features/company/domain/entities/company_profile.dart';
 import 'package:labaik/features/company/domain/entities/company_notification.dart';
 import 'package:labaik/features/company/domain/entities/company_overview.dart';
 import 'package:labaik/features/company/domain/entities/company_trip.dart';
@@ -19,7 +20,8 @@ import 'package:labaik/features/company/presentation/cubits/company_trips_cubit.
 import 'package:labaik/features/company/presentation/pages/company_create_trip_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_group_detail_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_members_screen.dart';
-import 'package:labaik/features/company/presentation/widgets/company_form_sheet.dart';
+import 'package:labaik/features/company/presentation/pages/company_create_group_screen.dart';
+import 'package:labaik/features/company/presentation/pages/company_data_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_notifications_screen.dart';
 import 'package:labaik/features/company/presentation/pages/company_shell.dart';
 import 'package:labaik/features/company/presentation/pages/company_trips_screen.dart';
@@ -38,6 +40,17 @@ class FakeCompany implements CompanyRepository {
   @override
   Future<CompanyOverview> overview() async =>
       CompanyOverview(firstName: 'محمد', companyName: 'شركة النور', activeTrips: 3, pilgrims: 75, supervisors: rosterList.length, groups: groupsList.length);
+
+  var profileData = const CompanyProfile(name: 'شركة النور', licenseNumber: 'LAB-2026-014', contactName: 'محمد', country: 'فلسطين', city: 'غزة', email: 'info@example.com');
+
+  @override
+  Future<CompanyProfile> profile() async => profileData;
+
+  @override
+  Future<CompanyProfile> updateProfile(CompanyProfile profile) async => profileData = profile;
+
+  @override
+  Future<void> removeMember(String groupId, String userId) async => membersList.removeWhere((m) => m.userId == userId);
 
   @override
   Future<List<CompanyTrip>> trips() async => const [
@@ -273,7 +286,7 @@ void main() {
     expect(find.byType(CompanyTripsScreen), findsNothing);
   });
 
-  testWidgets('create group → join code → assign a new supervisor → add a pilgrim', (tester) async {
+  testWidgets('create group page → join code popup → details → add supervisor → members → profile edit', (tester) async {
     tester.view.physicalSize = const Size(393 * 3, 852 * 3);
     tester.view.devicePixelRatio = 3;
     tester.view.padding = const FakeViewPadding(top: 59 * 3, bottom: 34 * 3);
@@ -287,60 +300,95 @@ void main() {
     await tester.pumpAndSettle();
     Finder text(String value) => find.text(value, findRichText: true);
 
-    // "إنشاء المجموعات" بالرئيسية → النموذج (الرحلة + الاسم)
+    // "إنشاء المجموعات" بالرئيسية → صفحة "إنشاء مجموعة جديدة"
     await tester.tap(text('إنشاء  المجموعات'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(find.byType(CompanyFormSheet), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'إنشاء'));
+    expect(find.byType(CompanyCreateGroupScreen), findsOneWidget);
+    await tester.tap(text('إنشاء المجموعة'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(text('عبّي الحقول المطلوبة'), findsOneWidget);
+    expect(text('اختار الرحلة واكتب اسم المجموعة'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'مجموعة أ');
-    await tester.tap(find.widgetWithText(FilledButton, 'إنشاء'));
+    await tester.tap(text('اختار الرحلة'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(find.byType(CompanyFormSheet), findsNothing);
-    expect(text('تم إنشاء المجموعة — رمزها K7P2QX'), findsOneWidget);
+    await tester.tap(find.textContaining('رحلة العمرة الأولى').last);
+    await tester.pumpAndSettle();
+    await tester.tap(text('إنشاء المجموعة'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(text('تم إنشاء المجموعة'), findsOneWidget);
+    expect(text('رمز الانضمام: K7P2QX'), findsOneWidget);
+    await tester.tap(text('العودة للمجموعات'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanyCreateGroupScreen), findsNothing);
     expect(repo.groupsList.single.name, 'مجموعة أ');
-    expect(text('1'), findsOneWidget); // عدد المجموعات بالرئيسية تحدّث
-    await tester.pump(const Duration(seconds: 3)); // الرسالة بتختفي عن شريط التنقل
+    await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
 
-    // تبويب المجموعات → الكرت → التفاصيل فيها الرمز و"بلا مشرف بعد"
+    // تبويب المجموعات: الكرت "غير مكتملة" → التفاصيل
     await tester.tap(text('المجموعات').last, warnIfMissed: false);
     await tester.pumpAndSettle();
-    await tester.tap(text('مجموعة أ'), warnIfMissed: false);
+    expect(text('غير مكتملة'), findsWidgets);
+    expect(text('مشرف المجموعة : لا يوجد بعد'), findsOneWidget);
+    await tester.tap(text('عرض تفاصيل المجموعة'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.byType(CompanyGroupDetailScreen), findsOneWidget);
     expect(text('K7P2QX'), findsOneWidget);
-    expect(text('بلا مشرف بعد'), findsOneWidget);
+    expect(text('إضافة اعضاء مجموعة'), findsOneWidget);
 
-    // المشرف: الشركة ما عندها مشرفين → نموذج "إضافة مشرف جديد" مباشرة → بيتعيّن
-    await tester.tap(text('المشرف'), warnIfMissed: false);
+    // "إضافة المشرف": الشركة بلا مشرفين → صفحة "إضافة مشرف جديد" → بيتعيّن
+    await tester.tap(text('إضافة المشرف'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(text('إضافة مشرف جديد'), findsOneWidget);
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'عمر حداد');
     await tester.enterText(fields.at(1), 'omar@x.com');
-    await tester.tap(find.widgetWithText(FilledButton, 'إضافة'));
+    await tester.enterText(fields.at(2), '0591234567');
+    await tester.tap(text('إضافة المشرف').last, warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(text('المشرف: عمر حداد'), findsOneWidget);
+    expect(text('مشرف المجموعة : عمر حداد'), findsOneWidget);
+    expect(text('تغيير المشرف'), findsOneWidget);
     expect(repo.rosterList.single.email, 'omar@x.com');
 
     // الأعضاء → إضافة معتمر بالإيميل
-    await tester.tap(text('الأعضاء'), warnIfMissed: false);
+    await tester.tap(text('إضافة اعضاء مجموعة'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.byType(CompanyMembersScreen), findsOneWidget);
-    expect(text('مشرف المجموعة'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3)); // رسالة "تمت إضافة المشرف" بتختفي عن الزر
+    await tester.pumpAndSettle();
     await tester.tap(text('إضافة عضو'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(1), 'not-an-email');
-    await tester.tap(find.widgetWithText(FilledButton, 'إضافة'));
-    await tester.pumpAndSettle();
-    expect(text('البريد الإلكتروني غير صحيح'), findsOneWidget);
     await tester.enterText(find.byType(TextField).at(1), 'ahmad@x.com');
     await tester.enterText(find.byType(TextField).at(2), 'أحمد علي');
     await tester.tap(find.widgetWithText(FilledButton, 'إضافة'));
     await tester.pumpAndSettle();
     expect(text('أحمد علي'), findsOneWidget);
-    expect(text('معتمر رقم 1'), findsOneWidget);
+    // ضغط مطوّل → حذف من المجموعة
+    await tester.longPress(text('أحمد علي'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(text('حذف من المجموعة'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(text('أحمد علي'), findsNothing);
+    expect(repo.membersList.where((m) => !m.isSupervisor), isEmpty);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    // الملف الشخصي: بيانات الشركة من /company/me → تعديل → حفظ
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    await tester.tap(text('الملف الشخصي').last, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(text('شركة النور'), findsOneWidget);
+    expect(text('LAB-2026-014'), findsOneWidget);
+    expect(text('غزة'), findsOneWidget);
+    await tester.tap(text('بيانات الشركة'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanyDataScreen), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'شركة الهدى');
+    await tester.tap(text('حفظ التعديلات'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanyDataScreen), findsNothing);
+    expect(repo.profileData.name, 'شركة الهدى');
+    expect(text('شركة الهدى'), findsOneWidget);
   });
 }

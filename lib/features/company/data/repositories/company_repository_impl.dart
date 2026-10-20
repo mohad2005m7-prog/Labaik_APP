@@ -3,6 +3,7 @@ import '../../domain/entities/company_group.dart';
 import '../../domain/entities/company_member.dart';
 import '../../domain/entities/company_notification.dart';
 import '../../domain/entities/company_overview.dart';
+import '../../domain/entities/company_profile.dart';
 import '../../domain/entities/company_trip.dart';
 import '../../domain/repositories/company_repository.dart';
 import '../models/company_json.dart';
@@ -22,19 +23,28 @@ class CompanyRepositoryImpl implements CompanyRepository {
   Future<CompanyOverview> overview() async {
     final name = (await AuthSession.current())?.fullName.trim() ?? '';
     final firstName = name.isEmpty ? '' : name.split(RegExp(r'\s+')).first;
-    final (me, home) = (_api.me(), _api.home());
-    final company = await me;
-    final numbers = await home;
-    final companyName = company['name']?.toString().trim();
+    // كل طلب لحاله: لو فشل واحد بيضل التاني يبين (الاسم بلا أرقام أو العكس)
+    final results = await Future.wait([_api.me().then<Object?>((v) => v, onError: (Object e) => e), _api.home().then<Object?>((v) => v, onError: (Object e) => e)]);
+    final company = results[0];
+    final numbers = results[1];
+    if (company is! Map<String, dynamic> && numbers is! Map<String, dynamic>) throw company!;
+    final companyName = company is Map<String, dynamic> ? company['name']?.toString().trim() : null;
+    final n = numbers is Map<String, dynamic> ? numbers : const <String, dynamic>{};
     return CompanyOverview(
       firstName: firstName,
       companyName: companyName == null || companyName.isEmpty ? null : companyName,
-      activeTrips: _int(numbers['activeTrips']),
-      pilgrims: _int(numbers['pilgrimsCount']),
-      supervisors: _int(numbers['supervisorsCount']),
-      groups: _int(numbers['groupsCount']),
+      activeTrips: _int(n['activeTrips']),
+      pilgrims: _int(n['pilgrimsCount']),
+      supervisors: _int(n['supervisorsCount']),
+      groups: _int(n['groupsCount']),
     );
   }
+
+  @override
+  Future<CompanyProfile> profile() async => CompanyJson.profile(await _api.me());
+
+  @override
+  Future<CompanyProfile> updateProfile(CompanyProfile profile) async => CompanyJson.profile(await _api.updateMe(CompanyJson.profileBody(profile)));
 
   @override
   Future<List<CompanyTrip>> trips() async {
@@ -84,6 +94,9 @@ class CompanyRepositoryImpl implements CompanyRepository {
     });
     return CompanyJson.group(json, trip: await _tripOf(json['tripId']?.toString() ?? ''));
   }
+
+  @override
+  Future<void> removeMember(String groupId, String userId) => _api.removeMember(groupId, userId);
 
   @override
   Future<List<CompanySupervisor>> supervisors() async => [for (final j in await _api.supervisors()) CompanyJson.supervisor(j)];

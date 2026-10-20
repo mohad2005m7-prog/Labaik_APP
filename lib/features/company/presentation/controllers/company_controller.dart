@@ -1,44 +1,66 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/l10n/common_text.dart';
 import '../../../../core/utils/token_storage.dart';
 import '../../../auth/data/auth_session.dart';
 import '../../../auth/presentation/pages/auth_welcome_screen.dart';
+import '../../../auth/presentation/pages/reset_password_screen.dart';
 import '../../../family/presentation/controllers/family_controller.dart';
 import '../../../group/data/sources/group_realtime.dart';
 import '../../../group/presentation/controllers/group_controller.dart';
+import '../../../supervisor/domain/entities/group_member.dart';
+import '../../../supervisor/presentation/pages/member_details_screen.dart';
+import '../../../terms/presentation/controllers/terms_controller.dart';
 import '../../data/repositories/company_repository_impl.dart';
 import '../../domain/entities/company_group.dart';
+import '../../domain/entities/company_member.dart';
+import '../../domain/entities/company_profile.dart';
 import '../../domain/entities/company_trip.dart';
 import '../../domain/repositories/company_repository.dart';
 import '../cubits/company_groups_cubit.dart';
 import '../cubits/company_home_cubit.dart';
 import '../cubits/company_notifications_cubit.dart';
+import '../cubits/company_profile_cubit.dart';
 import '../cubits/company_trips_cubit.dart';
 import '../l10n/company_forms_text.dart';
-import '../widgets/company_form_sheet.dart';
+import '../pages/company_add_supervisor_screen.dart';
 import '../pages/company_contact_screen.dart';
+import '../pages/company_create_group_screen.dart';
 import '../pages/company_create_trip_screen.dart';
 import '../pages/company_data_screen.dart';
 import '../pages/company_group_detail_screen.dart';
-import '../pages/company_member_page_screen.dart';
+import '../pages/company_help_screen.dart';
 import '../pages/company_members_screen.dart';
 import '../pages/company_notifications_screen.dart';
 import '../pages/company_settings_screen.dart';
+import '../pages/company_supervisors_screen.dart';
+import '../pages/company_trip_details_screen.dart';
 
 // -------------------------------------------------------------
-// التنقل بواجهة الشركة (كل الشاشات المدفوعة من هنا)
+// التنقل بواجهة الشركة (كل الشاشات المدفوعة من هنا) — والتحديث بعد أي تعديل
 // -------------------------------------------------------------
-typedef CompanySupervisorLike = ({String name, String email});
-
 abstract final class CompanyController {
   static CompanyRepository Function() repository = CompanyRepositoryImpl.new;
 
-  static void comingSoon(BuildContext context) {
+  static void comingSoon(BuildContext context) => showMessage(context, CommonText.comingSoon());
+
+  static void showMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(CommonText.comingSoon()), duration: const Duration(milliseconds: 1600)));
+      ..showSnackBar(SnackBar(content: Text(message), duration: const Duration(milliseconds: 2400)));
+  }
+
+  /// رسالة خطأ السيرفر (انقطاع، صلاحية، ...)
+  static void showError(BuildContext context, Object error) => showMessage(context, ApiErrorText.of(error)());
+
+  /// بعد أي تعديل: الأرقام بالرئيسية والقوائم والملف الشخصي بتتحدّث من السيرفر
+  static void refreshAll(BuildContext context) {
+    context.read<CompanyHomeCubit>().load();
+    context.read<CompanyTripsCubit>().load();
+    context.read<CompanyGroupsCubit>().load();
+    context.read<CompanyProfileCubit>().load();
   }
 
   static Future<void> openNotifications(BuildContext context) {
@@ -49,18 +71,7 @@ abstract final class CompanyController {
     );
   }
 
-  static void showMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message), duration: const Duration(milliseconds: 2400)));
-  }
-
-  /// بعد أي تعديل (رحلة/مجموعة/عضو/مشرف): الأرقام بالرئيسية والقوائم بتتحدّث من السيرفر
-  static void refreshAll(BuildContext context) {
-    context.read<CompanyHomeCubit>().load();
-    context.read<CompanyTripsCubit>().load();
-    context.read<CompanyGroupsCubit>().load();
-  }
+  // ───────── الرحلات ─────────
 
   /// "إنشاء رحلة" / "+ إنشاء رحلة جديدة" → شاشة إنشاء رحلة (POST /company/trips)
   static Future<void> createTrip(BuildContext context) async {
@@ -69,135 +80,138 @@ abstract final class CompanyController {
     if (created == true && context.mounted) refreshAll(context);
   }
 
-  /// "إنشاء المجموعات" / "إنشاء مجموعة": نختار الرحلة ونكتب الاسم (POST /company/trips/{id}/groups)
-  /// بعدها بيطلع رمز المجموعة اللي بيدخله المعتمر حتى ينضم
-  static Future<void> createGroups(BuildContext context) async {
+  /// "عرض تفاصيل الرحلة" → تفاصيل الرحلة ومجموعاتها
+  static Future<void> openTrip(BuildContext context, CompanyTrip trip) async {
     final repo = context.read<CompanyRepository>();
-    var trips = context.read<CompanyTripsCubit>().state.trips;
-    if (trips.isEmpty) {
-      try {
-        trips = await repo.trips();
-      } catch (_) {}
-    }
-    if (!context.mounted) return;
-    if (trips.isEmpty) return showMessage(context, CompanyFormsText.needTripFirst());
-    final choice = CompanySheetChoice(label: CompanyFormsText.trip(), labels: [for (final t in trips) t.title]);
-    final name = CompanySheetField(label: CompanyFormsText.groupName(), hint: CompanyFormsText.groupNameHint());
-    CompanyGroup? group;
-    final done = await CompanyFormSheet.show(
-      context,
-      CompanyFormSheet(
-        title: CompanyFormsText.createGroupTitle(),
-        subtitle: CompanyFormsText.createGroupSubtitle(),
-        choice: choice,
-        fields: [name],
-        submitLabel: CompanyFormsText.create(),
-        onSubmit: () async => group = await repo.createGroup(tripId: trips[choice.index].id, name: name.value),
-      ),
-    );
-    if (!done || !context.mounted) return;
-    refreshAll(context);
-    showMessage(context, CompanyFormsText.groupCreated(group?.joinCode ?? ''));
-  }
-
-  /// "عرض تفاصيل الرحلة"
-  static void openTrip(BuildContext context, CompanyTrip trip) => comingSoon(context);
-
-  /// الملف الشخصي → بيانات الشركة
-  static void openCompanyData(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyDataScreen()));
-
-  /// الملف الشخصي → معلومات التواصل
-  static void openContact(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyContactScreen()));
-
-  /// الملف الشخصي → الإعدادات
-  static void openSettings(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanySettingsScreen()));
-
-  /// تفاصيل المجموعة (رمز الانضمام، المشرف، الأعضاء) — لما يرجع بنحدّث الأرقام والقوائم
-  static Future<void> openGroupDetail(BuildContext context, CompanyGroup group) async {
-    final repo = context.read<CompanyRepository>();
-    final changed = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyGroupDetailScreen(group: group, repository: repo)));
+    final changed = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyTripDetailsScreen(trip: trip, repository: repo)));
     if (changed == true && context.mounted) refreshAll(context);
   }
 
-  /// قائمة أعضاء المجموعة — بترجع true لو انضاف عضو
-  static Future<bool> openMembers(BuildContext context, CompanyRepository repo, CompanyGroup group) async =>
-      await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyMembersScreen(group: group, repository: repo))) ?? false;
+  // ───────── المجموعات ─────────
 
-  /// صفحة عضو
-  static void openMemberPage(BuildContext context, CompanyRepository repo, {required String groupId, required String memberId, required String name}) => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => CompanyMemberPageScreen(repository: repo, groupId: groupId, memberId: memberId, name: name)),
-      );
-
-  /// مشرف المجموعة: نختار من مشرفي الشركة (PUT /company/groups/{id}/supervisor)
-  /// أو "إضافة مشرف جديد" (POST /company/supervisors — بتوصله كلمة مؤقتة) وبعدها بيتعيّن مباشرة
-  static Future<CompanyGroup?> assignSupervisor(BuildContext context, CompanyRepository repo, CompanyGroup group) async {
-    List<CompanySupervisorLike> roster;
+  /// "إنشاء المجموعات" / "إنشاء مجموعة" → صفحة "إنشاء مجموعة جديدة" (الرحلة والاسم والمشرف) ← رمز الانضمام
+  static Future<void> createGroups(BuildContext context, {CompanyTrip? trip}) async {
+    final repo = context.read<CompanyRepository>();
+    List<CompanyTrip> trips;
+    List<CompanySupervisor> roster;
     try {
-      roster = [for (final s in await repo.supervisors()) (name: s.name, email: s.email)];
+      final cached = context.read<CompanyTripsCubit>().state.trips;
+      final results = await Future.wait<Object>([if (cached.isEmpty) repo.trips() else Future.value(cached), repo.supervisors().catchError((_) => const <CompanySupervisor>[])]);
+      trips = results[0] as List<CompanyTrip>;
+      roster = results[1] as List<CompanySupervisor>;
     } catch (e) {
-      if (context.mounted) showMessage(context, CompanyFormsText.loadFailed());
-      return null;
+      if (context.mounted) showError(context, e);
+      return;
     }
-    if (!context.mounted) return null;
-    // الشركة لسا ما عندها مشرفين: مباشرة لنموذج الإضافة
-    if (roster.isEmpty) return _addAndAssign(context, repo, group);
-    final current = roster.indexWhere((s) => s.name == group.supervisorName);
-    // آخر خيار "+ إضافة مشرف جديد" بيفتح نموذج الإضافة
-    final choice = CompanySheetChoice(
-      label: CompanyFormsText.supervisor(),
-      labels: [for (final s in roster) '${s.name} (${s.email})', '+ ${CompanyFormsText.newSupervisor()}'],
-      index: current < 0 ? 0 : current,
-    );
-    CompanyGroup? updated;
-    var wantsNew = false;
-    final done = await CompanyFormSheet.show(
+    if (!context.mounted) return;
+    if (trips.isEmpty) return showMessage(context, CompanyFormsText.needTripFirst());
+    final created = await Navigator.push<CompanyGroup>(
       context,
-      CompanyFormSheet(
-        title: CompanyFormsText.assignTitle(),
-        subtitle: CompanyFormsText.assignSubtitle(),
-        choice: choice,
-        fields: const [],
-        submitLabel: CompanyFormsText.assign(),
-        notFoundMessage: CompanyFormsText.supervisorNotOnRoster(),
-        onSubmit: () async {
-          if (choice.index >= roster.length) {
-            wantsNew = true;
-            return;
-          }
-          updated = await repo.assignSupervisor(group.id, roster[choice.index].email);
-        },
-      ),
+      MaterialPageRoute(builder: (_) => CompanyCreateGroupScreen(repository: repo, trips: trip == null ? trips : [trip], supervisors: roster)),
     );
-    if (!context.mounted || !done) return null;
-    if (wantsNew) return _addAndAssign(context, repo, group);
-    showMessage(context, CompanyFormsText.assigned());
-    return updated;
+    if (created != null && context.mounted) refreshAll(context);
   }
 
-  static Future<CompanyGroup?> _addAndAssign(BuildContext context, CompanyRepository repo, CompanyGroup group) async {
-    final name = CompanySheetField(label: CompanyFormsText.fullNameRequired(), hint: CompanyFormsText.fullNameHint());
-    final email = CompanySheetField(label: CompanyFormsText.email(), hint: CompanyFormsText.emailHint(), keyboard: TextInputType.emailAddress);
-    final phone = CompanySheetField(label: CompanyFormsText.phone(), hint: CompanyFormsText.phoneHint(), keyboard: TextInputType.phone, required: false);
-    CompanyGroup? updated;
-    final done = await CompanyFormSheet.show(
+  /// تفاصيل المجموعة — لما يرجع وفي تغيير بنحدّث الأرقام والقوائم
+  static Future<bool> openGroupDetail(BuildContext context, CompanyGroup group, {bool refresh = true}) async {
+    final repo = context.read<CompanyRepository>();
+    final trips = context.read<CompanyTripsCubit>().state.trips;
+    final trip = trips.where((t) => t.id == group.tripId).firstOrNull;
+    final changed = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyGroupDetailScreen(group: group, repository: repo, trip: trip))) ?? false;
+    if (changed && refresh && context.mounted) refreshAll(context);
+    return changed;
+  }
+
+  /// أعضاء المجموعة — بترجع عدد المعتمرين الجديد لو تغيّر (إضافة أو حذف)، وإلا null
+  static Future<int?> openMembers(BuildContext context, CompanyRepository repo, CompanyGroup group) =>
+      Navigator.push<int>(context, MaterialPageRoute(builder: (_) => CompanyMembersScreen(group: group, repository: repo)));
+
+  /// صفحة العضو — نفس صفحة "صفحة احد الاعضاء" عند المشرف (Figma واحد)
+  static Future<void> openMemberPage(BuildContext context, CompanyRepository repo, {required String groupId, required CompanyMember member}) async {
+    var m = member;
+    try {
+      m = await repo.member(groupId, member.userId);
+    } catch (_) {
+      // بنعرض اللي عنا من القائمة
+    }
+    if (!context.mounted) return;
+    Navigator.push(
       context,
-      CompanyFormSheet(
-        title: CompanyFormsText.newSupervisor(),
-        subtitle: CompanyFormsText.newSupervisorSubtitle(),
-        fields: [name, email, phone],
-        submitLabel: CompanyFormsText.add(),
-        conflictMessage: CompanyFormsText.supervisorExists(),
-        onSubmit: () async {
-          final supervisor = await repo.addSupervisor(fullName: name.value, email: email.value, phone: phone.value);
-          updated = await repo.assignSupervisor(group.id, supervisor.email);
-        },
+      MaterialPageRoute(
+        builder: (_) => MemberDetailsScreen(
+          member: GroupMember(id: m.userId, name: m.name, photo: m.photoUrl, present: m.present, number: m.number, email: m.email, nationality: m.nationality, health: m.healthNotes, notes: m.notes),
+        ),
       ),
     );
-    if (!context.mounted || !done) return null;
-    showMessage(context, CompanyFormsText.assigned());
-    return updated;
   }
+
+  // ───────── المشرفين ─────────
+
+  /// "إدارة المشرفين"
+  static void openSupervisors(BuildContext context) {
+    final repo = context.read<CompanyRepository>();
+    Navigator.push(context, MaterialPageRoute(builder: (_) => CompanySupervisorsScreen(repository: repo))).then((_) {
+      if (context.mounted) refreshAll(context);
+    });
+  }
+
+  /// "إضافة مشرف جديد" (POST /company/supervisors — بتوصله كلمة مؤقتة بالإيميل) — بترجع المشرف لو انضاف
+  static Future<CompanySupervisor?> openAddSupervisor(BuildContext context, CompanyRepository repo) =>
+      Navigator.push<CompanySupervisor>(context, MaterialPageRoute(builder: (_) => CompanyAddSupervisorScreen(repository: repo)));
+
+  // ───────── الملف الشخصي ─────────
+
+  /// "بيانات الشركة" (القلم) → تعديل بيانات الشركة
+  static Future<void> openCompanyData(BuildContext context) => _editProfile(context, (repo, p) => CompanyDataScreen(repository: repo, profile: p));
+
+  /// "معلومات التواصل"
+  static Future<void> openContact(BuildContext context) => _editProfile(context, (repo, p) => CompanyContactScreen(repository: repo, profile: p));
+
+  static Future<void> _editProfile(BuildContext context, Widget Function(CompanyRepository, CompanyProfile) screen) async {
+    final repo = context.read<CompanyRepository>();
+    final cubit = context.read<CompanyProfileCubit>();
+    var profile = cubit.state.profile;
+    if (profile == null) {
+      try {
+        profile = await repo.profile();
+      } catch (e) {
+        if (context.mounted) showError(context, e);
+        return;
+      }
+    }
+    if (!context.mounted) return;
+    final saved = await Navigator.push<CompanyProfile>(context, MaterialPageRoute(builder: (_) => screen(repo, profile!)));
+    if (saved != null && context.mounted) {
+      cubit.set(saved);
+      context.read<CompanyHomeCubit>().load();
+    }
+  }
+
+  /// "المساعدة والدعم"
+  static void openHelp(BuildContext context) {
+    final name = context.read<CompanyProfileCubit>().state.profile?.name ?? '';
+    Navigator.push(context, MaterialPageRoute(builder: (_) => CompanyHelpScreen(companyName: name)));
+  }
+
+  /// الترس → الإعدادات
+  static void openSettings(BuildContext context) {
+    final profile = context.read<CompanyProfileCubit>();
+    final home = context.read<CompanyHomeCubit>();
+    final repo = context.read<CompanyRepository>();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MultiBlocProvider(
+          providers: [BlocProvider.value(value: profile), BlocProvider.value(value: home)],
+          child: RepositoryProvider.value(value: repo, child: const CompanySettingsScreen()),
+        ),
+      ),
+    );
+  }
+
+  static void changePassword(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetPasswordScreen()));
+
+  static void openTerms(BuildContext context) => TermsController.open(context);
 
   /// تسجيل الخروج (نفس نمط PilgrimAccountController.logout)
   static Future<void> logout(BuildContext context) async {

@@ -4,8 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/company_group.dart';
 import '../../domain/repositories/company_repository.dart';
 
-/// فلتر المجموعات: الكل / النشطة / المنتهية
-enum CompanyGroupsFilter { all, active, ended }
+/// فلتر المجموعات (Figma): الكل / مكتملة (فيها مشرف) / غير مكتملة (بلا مشرف)
+enum CompanyGroupsFilter { all, complete, incomplete }
 
 class CompanyGroupsState extends Equatable {
   final bool loaded;
@@ -20,8 +20,8 @@ class CompanyGroupsState extends Equatable {
     return [
       for (final g in groups)
         if ((filter == CompanyGroupsFilter.all ||
-                (filter == CompanyGroupsFilter.active && g.status == CompanyGroupStatus.active) ||
-                (filter == CompanyGroupsFilter.ended && g.status == CompanyGroupStatus.ended)) &&
+                (filter == CompanyGroupsFilter.complete && g.supervisorName != null) ||
+                (filter == CompanyGroupsFilter.incomplete && g.supervisorName == null)) &&
             (q.isEmpty || g.name.contains(q) || g.tripName.contains(q)))
           g,
     ];

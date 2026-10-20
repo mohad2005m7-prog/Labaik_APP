@@ -1,104 +1,79 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/figma_text.dart';
 import '../../../../core/widgets/figma_page.dart';
+import '../../domain/entities/company_profile.dart';
+import '../../domain/repositories/company_repository.dart';
+import '../controllers/company_controller.dart';
 import '../l10n/company_profile_text.dart';
-import '../widgets/company_colors.dart';
+import '../widgets/company_form_fields.dart';
 
 // -------------------------------------------------------------
-// "معلومات التواصل" — Figma (393×852) → FigmaPage
-// 3 حقول: رقم الهاتف / البريد الإلكتروني / الموقع الإلكتروني + زر حفظ
+// "معلومات التواصل" — مطابقة لـ Figma 672:4061
+// البريد الإلكتروني الرسمي / رقم الهاتف / اسم مسؤول الشركة + "حفظ التعديلات"
+// الحفظ: PUT /company/me (officialEmail / primaryPhone / contactFullName — والباقي زي ما هو)
 // -------------------------------------------------------------
 class CompanyContactScreen extends StatefulWidget {
-  const CompanyContactScreen({super.key});
+  final CompanyRepository repository;
+  final CompanyProfile profile;
+
+  const CompanyContactScreen({super.key, required this.repository, required this.profile});
 
   @override
   State<CompanyContactScreen> createState() => _CompanyContactScreenState();
 }
 
 class _CompanyContactScreenState extends State<CompanyContactScreen> {
-  final _phone = TextEditingController();
-  final _email = TextEditingController();
-  final _website = TextEditingController();
+  late final _email = TextEditingController(text: widget.profile.email ?? '');
+  late final _phone = TextEditingController(text: widget.profile.phone ?? '');
+  late final _contact = TextEditingController(text: widget.profile.contactName);
+  bool _busy = false;
+
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
-    _phone.dispose();
     _email.dispose();
-    _website.dispose();
+    _phone.dispose();
+    _contact.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _save() async {
     FocusScope.of(context).unfocus();
-    Navigator.pop(context);
+    if (_busy) return;
+    if (_contact.text.trim().isEmpty) return CompanyController.showMessage(context, CompanyProfileText.required());
+    final email = _email.text.trim();
+    if (email.isNotEmpty && !_emailPattern.hasMatch(email)) return CompanyController.showMessage(context, CompanyProfileText.invalidEmail());
+    setState(() => _busy = true);
+    try {
+      final saved = await widget.repository.updateProfile(widget.profile.copyWith(email: email, phone: _phone.text, contactName: _contact.text));
+      if (!mounted) return;
+      CompanyController.showMessage(context, CompanyProfileText.saved());
+      Navigator.of(context).pop(saved);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      CompanyController.showError(context, e);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return FigmaPage(
-      title: CompanyProfileText.contactTitle(),
+      title: CompanyProfileText.contactInfo(),
       titleRight: 349,
       chevronLeft: 367,
       body: (c) => [
-        _label(c, CompanyProfileText.phone(), 117),
-        _field(c, _phone, CompanyProfileText.phoneHint(), 160.5, keyboard: TextInputType.phone),
-        _label(c, CompanyProfileText.email(), 216),
-        _field(c, _email, CompanyProfileText.emailHint(), 259.5, keyboard: TextInputType.emailAddress),
-        _label(c, CompanyProfileText.website(), 315),
-        _field(c, _website, CompanyProfileText.websiteHint(), 358.5, keyboard: TextInputType.url),
-        c.button(CompanyProfileText.saveButton(), left: 16, top: 449, figmaSpacing: true, onTap: _submit),
+        c.box(left: 17, top: 108, width: 360, height: 1, color: const Color(0xFFE5E5EA)),
+        companyFieldLabel(c, CompanyProfileText.officialEmail(), top: 130, right: 382, width: 366),
+        c.rect(left: 16, top: 160, width: 366, height: 53, child: CompanyTextBox(s: c.s, controller: _email, hint: CompanyProfileText.emailHint(), keyboard: TextInputType.emailAddress)),
+        companyFieldLabel(c, CompanyProfileText.phone(), top: 229, right: 382, width: 366),
+        c.rect(left: 16, top: 259, width: 366, height: 53, child: CompanyTextBox(s: c.s, controller: _phone, hint: CompanyProfileText.phoneHint(), keyboard: TextInputType.phone)),
+        companyFieldLabel(c, CompanyProfileText.contactName(), top: 328, right: 382, width: 366),
+        c.rect(left: 16, top: 358, width: 366, height: 53, child: CompanyTextBox(s: c.s, controller: _contact, hint: CompanyProfileText.contactNameHint())),
+        c.button(CompanyProfileText.save(), left: 16, top: 449, width: 366, figmaSpacing: true, onTap: _save),
+        if (_busy) c.rect(left: 16, top: 449, width: 366, height: 50, child: const CompanyBusyButton()),
       ],
-    );
-  }
-
-  Widget _label(dynamic c, String text, double top) => c.text(
-        text,
-        left: 16,
-        top: top,
-        width: 361,
-        height: 22,
-        align: TextAlign.end,
-        dy: 0,
-        style: c.style(13, FigmaWeight.sfRegular, CompanyColors.green, lineHeight: null, letterSpacing: 0),
-      );
-
-  Widget _field(dynamic c, TextEditingController ctrl, String hint, double top, {TextInputType? keyboard}) => c.rect(
-        left: 16.5,
-        top: top,
-        width: 365,
-        height: 52,
-        child: _ContactTextField(controller: ctrl, hint: hint, keyboard: keyboard),
-      );
-}
-
-class _ContactTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final TextInputType? keyboard;
-
-  const _ContactTextField({required this.controller, required this.hint, this.keyboard});
-
-  static const _bg = Color(0xFFF9F9F9);
-  static const _border = Color(0xFFE5E5EA);
-
-  @override
-  Widget build(BuildContext context) {
-    final style = TextStyle(fontSize: 14, color: CompanyColors.green, fontFamily: 'NotoSansArabic', fontVariations: const [FontVariation('wght', FigmaWeight.sfRegular)]);
-    return DecoratedBox(
-      decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: _border)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: TextField(
-          controller: controller,
-          keyboardType: keyboard,
-          style: style,
-          textAlignVertical: TextAlignVertical.center,
-          cursorColor: CompanyColors.green,
-          decoration: InputDecoration.collapsed(hintText: hint, hintStyle: style.copyWith(color: CompanyColors.secondaryLabel)),
-          onTapOutside: (_) => FocusScope.of(context).unfocus(),
-        ),
-      ),
     );
   }
 }

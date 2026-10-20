@@ -38,24 +38,25 @@ abstract final class CompanyTripCard {
       // الخط الفاصل والرابط
       c.box(left: 24.5, top: top + 117.5, width: 344.5, height: 1, color: green.withValues(alpha: 0.57)),
       // "عرض تفاصيل الرحلة ›": السهم بحافة الكرت (x34) والنص ملزوق فيه (بعده بـ 8.5)
-      c.rect(left: 34, top: top + 127, width: 200, height: 22, child: _DetailsLink(c: c)),
+      c.rect(left: 34, top: top + 127, width: 200, height: 22, child: CompanyDetailsLink(c: c, text: CompanyTripsText.details())),
       c.tapArea(left: 16, top: top + 118, width: 361, height: height - 118, onTap: onDetails),
     ];
   }
 }
 
 // السهم "‹" (Icon / chevron.left — حبره 5×11.5 بخط 1.5) وبعده بـ 10 النص SF Compact 457 12
-class _DetailsLink extends StatelessWidget {
+// ("عرض تفاصيل الرحلة" / "عرض تفاصيل المجموعة")
+class CompanyDetailsLink extends StatelessWidget {
   final FigmaCanvas c;
+  final String text;
 
-  const _DetailsLink({required this.c});
+  const CompanyDetailsLink({super.key, required this.c, required this.text});
 
   @override
   Widget build(BuildContext context) {
     final s = c.s;
     final style = c.style(12, FigmaWeight.sfRegular, CompanyColors.green);
     final rtl = Directionality.of(context) == TextDirection.rtl;
-    final text = CompanyTripsText.details();
     final width = FigmaSpacedText.lineWidth(context, text, style, s.x(-0.408));
     return IgnorePointer(
       child: Row(

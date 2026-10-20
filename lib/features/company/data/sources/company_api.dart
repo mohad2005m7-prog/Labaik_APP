@@ -6,7 +6,7 @@ import '../../../auth/data/token_refresher.dart';
 
 // -------------------------------------------------------------
 // واجهة الشركة على سيرفر لبيك (/company — حساب الشركة بس، ملف إبراهيم flutter_handoff_2026-10-18 §5.3):
-//   GET  /company/me                     → CompanyDto (اسم الشركة للترحيب)
+//   GET/PUT /company/me                  → CompanyDto (اسم الشركة للترحيب، الملف الشخصي وتعديله)
 //   GET  /company/home                   → { activeTrips, pilgrimsCount, supervisorsCount, groupsCount }
 //   GET  /company/trips | /trips/{id}    → TripSummaryDto[] | TripDto (الوجهات بالتفاصيل بس)
 //   POST /company/trips                  → TripDto
@@ -24,6 +24,8 @@ class CompanyApi {
   factory CompanyApi.server() => CompanyApi(ApiClient(baseUrl: ApiConfig.baseUrl, accessToken: TokenStorage.getAccessToken, refreshToken: TokenRefresher.refresh));
 
   Future<Map<String, dynamic>> me() async => _map(await _client.getJson('/company/me'));
+
+  Future<Map<String, dynamic>> updateMe(Map<String, dynamic> body) async => _map(await _client.putJson('/company/me', body: body));
 
   Future<Map<String, dynamic>> home() async => _map(await _client.getJson('/company/home'));
 
