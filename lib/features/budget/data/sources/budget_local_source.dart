@@ -8,7 +8,7 @@ import '../models/budget_json.dart';
 
 // -------------------------------------------------------------
 // ميزانية المعتمر على الجهاز — كل حساب لحاله (بإيميله): budget:<email>
-// تسجيل الخروج ما بيمسحها، فبترجع لما يسجل دخول بنفس الحساب
+// تسجيل الخروج ما بيمسحها، فبترجع لما يسجل دخول بنفس الحساب — و[isDirty] = تغييرات لسا ما انرفعت للسيرفر
 // -------------------------------------------------------------
 class BudgetLocalSource {
   Future<String> _key() async => 'budget:${await AccountRegistry.currentEmail() ?? ''}';
@@ -24,4 +24,9 @@ class BudgetLocalSource {
   }
 
   Future<void> save(Budget budget) async => (await SharedPreferences.getInstance()).setString(await _key(), jsonEncode(budget.toJson()));
+
+  /// في تغييرات على الجهاز لسا ما وصلت السيرفر (انعملت بلا نت)
+  Future<bool> isDirty() async => (await SharedPreferences.getInstance()).getBool('${await _key()}:dirty') ?? false;
+
+  Future<void> setDirty(bool dirty) async => (await SharedPreferences.getInstance()).setBool('${await _key()}:dirty', dirty);
 }

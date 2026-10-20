@@ -2,7 +2,7 @@ import '../../domain/entities/budget.dart';
 import '../../domain/entities/expense.dart';
 
 // -------------------------------------------------------------
-// تحويل الميزانية لـ JSON وبالعكس (للحفظ على الجهاز، وجاهزة لـ API الميزانية لما ينضاف)
+// تحويل الميزانية لـ JSON وبالعكس (للحفظ على الجهاز — شكل السيرفر بـ BudgetApi)
 // -------------------------------------------------------------
 extension ExpenseJson on Expense {
   Map<String, dynamic> toJson() => {'id': id, 'title': title, 'amount': amount, 'createdAt': createdAt.toIso8601String()};

@@ -82,4 +82,10 @@ abstract final class TawafStepsText {
     'إذا لم تخلع نعليك بعد، اخلعهما الآن وضعهما في المكان\nالمخصص أو احتفظ بهما معك.',
     'If you have not taken off your shoes yet, take them off now and leave them in the shoe area or keep them with you.',
   );
+
+  // متابعة طواف/سعي ما كمل (التطبيق انسكّر بالنص) — مش بـ Figma
+  static String resumeTawaf(int round) => tr('لديك طواف لم يكتمل، هل تتابع من الشوط $round؟', 'You have an unfinished Tawaf. Continue from round $round?');
+  static String resumeSaee(int lap) => tr('لديك سعي لم يكتمل، هل تتابع من الشوط $lap؟', "You have an unfinished Sa'i. Continue from round $lap?");
+  static const resume = Tx('متابعة', 'Continue');
+  static const restart = Tx('البدء من جديد', 'Start over');
 }
