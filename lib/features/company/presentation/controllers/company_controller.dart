@@ -234,8 +234,8 @@ abstract final class CompanyController {
 
   /// "المساعدة والدعم"
   static void openHelp(BuildContext context) {
-    final name = context.read<CompanyProfileCubit>().state.profile?.name ?? '';
-    Navigator.push(context, MaterialPageRoute(builder: (_) => CompanyHelpScreen(companyName: name)));
+    final profile = context.read<CompanyProfileCubit>().state.profile;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => CompanyHelpScreen(companyName: profile?.name ?? '', supportEmail: profile?.supportEmail)));
   }
 
   /// الترس → الإعدادات

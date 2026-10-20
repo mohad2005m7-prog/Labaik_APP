@@ -9,15 +9,16 @@ import '../widgets/company_form_fields.dart';
 // -------------------------------------------------------------
 // "المساعدة والدعم" — مطابقة لـ Figma 698:4428
 // إلى (بريد دعم لبيك) / الموضوع / نص الرسالة (جاهز وفيه اسم الشركة) + "إرسال" → تطبيق البريد بالجهاز
-// بريد الدعم لسا ما وصلنا من إبراهيم: بيتحدد وقت البناء (--dart-define=LABAIK_SUPPORT_EMAIL=...)
-// ولو فاضي بيفتح البريد بلا مستلم (والسيرفر ما فيه endpoint للدعم — docs)
+// بريد الدعم: supportEmail من GET /company/me (إعدادات السيرفر Support:Email)، وإلا وقت البناء (--dart-define=LABAIK_SUPPORT_EMAIL=...)
+// ولو الاتنين فاضيين بيفتح البريد بلا مستلم
 // -------------------------------------------------------------
 class CompanyHelpScreen extends StatefulWidget {
   final String companyName;
+  final String? supportEmail;
 
-  const CompanyHelpScreen({super.key, required this.companyName});
+  const CompanyHelpScreen({super.key, required this.companyName, this.supportEmail});
 
-  static const supportEmail = String.fromEnvironment('LABAIK_SUPPORT_EMAIL');
+  static const buildSupportEmail = String.fromEnvironment('LABAIK_SUPPORT_EMAIL');
 
   @override
   State<CompanyHelpScreen> createState() => _CompanyHelpScreenState();
@@ -26,7 +27,7 @@ class CompanyHelpScreen extends StatefulWidget {
 class _CompanyHelpScreenState extends State<CompanyHelpScreen> {
   late final _subject = TextEditingController(text: CompanyProfileText.subjectDefault());
   late final _message = TextEditingController(text: CompanyProfileText.messageDefault(widget.companyName));
-  final _to = TextEditingController(text: CompanyHelpScreen.supportEmail);
+  late final _to = TextEditingController(text: (widget.supportEmail?.trim().isNotEmpty ?? false) ? widget.supportEmail!.trim() : CompanyHelpScreen.buildSupportEmail);
 
   @override
   void dispose() {

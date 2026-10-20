@@ -199,14 +199,14 @@ void main() {
     }));
     final user = await AuthSession.current();
     expect(user?.roles, ['Admin']);
-    expect(user?.isSupervisor, isTrue);
+    expect(user?.isSupervisor, isFalse); // من 20 أكتوبر: الـ Admin مش مشرف
 
     await AuthSession.saveFromResponse(jsonEncode({'user': {'id': 'u2', 'email': 'x@example.com', 'fullName': 'حاج', 'roles': []}}));
     expect((await AuthSession.current())?.isSupervisor, isFalse);
     await AuthSession.clear();
     expect(await AuthSession.current(), isNull);
 
-    // الدور بالتوكن (ClaimTypes.Role) → واجهة المشرف
+    // الدور بالتوكن (ClaimTypes.Role): Admin لحاله → لوحة الويب بس، و Admin + Supervisor → واجهة المشرف
     String jwt(Map<String, Object> claims) {
       String part(Map<String, Object> m) => base64Url.encode(utf8.encode(jsonEncode(m))).replaceAll('=', '');
       return '${part({'alg': 'HS256'})}.${part(claims)}.sig';
@@ -214,6 +214,9 @@ void main() {
 
     await TokenStorage.saveTokens(accessToken: jwt({'sub': 'u1', 'email': 'a@example.com', 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': 'Admin'}), refreshToken: 'r');
     await AccountRegistry.signedIn('a@example.com');
+    expect((await AccountRegistry.current())?.type, AccountType.superAdmin);
+    await TokenStorage.saveTokens(accessToken: jwt({'sub': 'u3', 'email': 's@example.com', 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': ['Admin', 'Supervisor']}), refreshToken: 'r');
+    await AccountRegistry.signedIn('s@example.com');
     expect((await AccountRegistry.current())?.type, AccountType.groupSupervisor);
   });
 

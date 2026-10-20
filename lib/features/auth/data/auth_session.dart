@@ -7,7 +7,7 @@ import '../../../core/utils/token_storage.dart';
 // -------------------------------------------------------------
 // بيانات المستخدم من رد الدخول (login / verify-email / google / refresh-token):
 //   { "accessToken", "refreshToken", "tokenType", "expiresIn", "user": { "id", "email", "fullName", "roles" } }
-// roles: [] = حاج — فيها "Supervisor" = مشرف — فيها "Admin" = مسؤول (نفس صلاحيات المشرف)
+// roles: [] = حاج — فيها "Supervisor" = مشرف — "Company" = شركة — "Admin" = مدير التطبيق (لوحة الويب بس)
 // بتتحدّث بس مع الدخول أو تجديد التوكن (ملف السيرفر) — وبتنمسح مع تسجيل الخروج
 // -------------------------------------------------------------
 class AuthUser {
@@ -18,8 +18,8 @@ class AuthUser {
 
   const AuthUser({required this.id, required this.email, required this.fullName, this.roles = const []});
 
-  /// "إنشاء مجموعة" للمشرف والمسؤول بس
-  bool get isSupervisor => roles.any((r) => r.toLowerCase() == 'supervisor' || r.toLowerCase() == 'admin');
+  /// "إنشاء مجموعة" للمشرف بس (السيرفر ما عاد يعطي الـ Admin صلاحيات المشرف)
+  bool get isSupervisor => roles.any((r) => r.toLowerCase() == 'supervisor');
 
   static AuthUser? fromJson(Object? json) {
     if (json is! Map<String, dynamic>) return null;

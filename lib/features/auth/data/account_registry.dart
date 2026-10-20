@@ -147,7 +147,8 @@ class AccountRegistry {
   }
 
   // الدور من السيرفر (role / roles): SuperAdmin | CompanyAdmin | Supervisor | Pilgrim
-  // (و"Admin" لحاله من النسخة القديمة للسيرفر = مشرف)
+  // "Admin" لحاله = مدير التطبيق (لوحة التحكم على الويب بس — من 20 أكتوبر السيرفر ما بيعطيه صلاحيات المشرف)
+  // و Admin + Supervisor = مشرف
   static AccountType? _typeIn(Map<String, dynamic>? json) {
     if (json == null) return null;
     for (final k in _roleKeys) {
@@ -162,7 +163,8 @@ class AccountRegistry {
     final roles = [for (final r in (value is List ? value : [value])) '$r'.trim().toLowerCase()];
     if (roles.contains('superadmin')) return AccountType.superAdmin;
     if (roles.any((r) => r == 'companyadmin' || r == 'company')) return AccountType.company;
-    if (roles.any((r) => r == 'supervisor' || r == 'groupsupervisor' || r == 'admin')) return AccountType.groupSupervisor;
+    if (roles.any((r) => r == 'supervisor' || r == 'groupsupervisor')) return AccountType.groupSupervisor;
+    if (roles.contains('admin')) return AccountType.superAdmin;
     if (roles.contains('pilgrim')) return AccountType.pilgrim;
     return null;
   }

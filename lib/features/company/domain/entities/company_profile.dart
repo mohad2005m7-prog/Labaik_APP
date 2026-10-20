@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 // -------------------------------------------------------------
 // بيانات الشركة (CompanyDto من GET /company/me) — الملف الشخصي وتعديل البيانات ومعلومات التواصل
 // [licenseNumber] = رقم السجل التجاري (رقم الترخيص) — [contactName] = اسم مسؤول الشركة
+// [supportEmail] = بريد دعم لبيك (من إعدادات السيرفر — لـ "المساعدة والدعم")
 // -------------------------------------------------------------
 class CompanyProfile extends Equatable {
   final String id;
@@ -14,6 +15,7 @@ class CompanyProfile extends Equatable {
   final String? email;
   final String? phone;
   final String contactName;
+  final String? supportEmail;
 
   const CompanyProfile({
     this.id = '',
@@ -25,6 +27,7 @@ class CompanyProfile extends Equatable {
     this.city,
     this.email,
     this.phone,
+    this.supportEmail,
   });
 
   CompanyProfile copyWith({String? logoUrl, String? name, String? licenseNumber, String? country, String? city, String? email, String? phone, String? contactName}) => CompanyProfile(
@@ -37,8 +40,9 @@ class CompanyProfile extends Equatable {
         email: email ?? this.email,
         phone: phone ?? this.phone,
         contactName: contactName ?? this.contactName,
+        supportEmail: supportEmail,
       );
 
   @override
-  List<Object?> get props => [id, name, logoUrl, licenseNumber, country, city, email, phone, contactName];
+  List<Object?> get props => [id, name, logoUrl, licenseNumber, country, city, email, phone, contactName, supportEmail];
 }

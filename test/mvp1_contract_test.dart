@@ -4,7 +4,7 @@ import 'package:labaik/features/group/data/models/home_group.dart';
 import 'package:labaik/features/group/domain/entities/group_preview.dart';
 
 void main() {
-  test('user.roles من رد الدخول: فاضية = حاج، Supervisor/Admin = مشرف', () {
+  test('user.roles من رد الدخول: فاضية = حاج، Supervisor = مشرف، Admin لحاله = لوحة الويب (من 20 أكتوبر)', () {
     final pilgrim = AuthUser.fromJson({'id': 'u1', 'email': 'a@b.c', 'fullName': 'حاج', 'roles': <String>[]})!;
     final supervisor = AuthUser.fromJson({'id': 'u2', 'email': 'a@b.c', 'fullName': 'مشرف', 'roles': ['Supervisor']})!;
     final admin = AuthUser.fromJson({'id': 'u3', 'email': 'a@b.c', 'fullName': 'مسؤول', 'roles': ['Admin']})!;
@@ -12,7 +12,7 @@ void main() {
 
     expect(pilgrim.isSupervisor, isFalse);
     expect(supervisor.isSupervisor, isTrue);
-    expect(admin.isSupervisor, isTrue);
+    expect(admin.isSupervisor, isFalse);
     expect(company.isSupervisor, isFalse);
     expect(company.roles, ['Company']);
   });

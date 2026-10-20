@@ -90,6 +90,7 @@ abstract final class CompanyJson {
         email: _opt(j, 'officialEmail'),
         phone: _opt(j, 'primaryPhone'),
         contactName: _str(j, 'contactFullName'),
+        supportEmail: _opt(j, 'supportEmail'),
       );
 
   /// UpdateMyCompanyCommand — الفاضي بيروح null
