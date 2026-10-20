@@ -18,6 +18,11 @@ class TripSetupData {
   ArrivalMethod? arrivalMethod; // طائرة / حافلة / سيارة
   String? arrivalPlace; // رمز المطار أو اسم المنفذ/نقطة الوصول
 
+  // موعد الانطلاق لمكة (شاشة "متى ستنطلق في رحلتك إلى مكة؟"): التاريخ والوقت بالدقائق من نص الليل
+  DateTime? departureDate;
+  int? departureMinute;
+  bool departureNotDecided = false;
+
   // المدن اللي اختارها المستخدم بشاشة "ما مسار رحلتك؟" (بالترتيب)
   List<String> routeCities = [];
 

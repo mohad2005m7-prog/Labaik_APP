@@ -24,19 +24,22 @@ class CustomStepProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // المسافة برا الـ Expanded حتى تطلع كل الخطوط بنفس العرض
     return Row(
-      children: List.generate(totalSteps, (index) {
-        return Expanded(
-          child: Container(
-            height: thickness,
-            margin: EdgeInsetsDirectional.only(start: index == 0 ? 0 : spacing),
-            decoration: BoxDecoration(
-              color: index < currentStep ? _activeColor : _inactiveColor,
-              borderRadius: BorderRadius.circular(thickness / 2),
+      children: [
+        for (var index = 0; index < totalSteps; index++) ...[
+          if (index > 0) SizedBox(width: spacing),
+          Expanded(
+            child: Container(
+              height: thickness,
+              decoration: BoxDecoration(
+                color: index < currentStep ? _activeColor : _inactiveColor,
+                borderRadius: BorderRadius.circular(thickness / 2),
+              ),
             ),
           ),
-        );
-      }),
+        ],
+      ],
     );
   }
 }

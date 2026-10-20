@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/l10n/common_text.dart';
+import '../../data/models/trip_setup_data.dart';
+import '../l10n/departure_text.dart';
 import '../widgets/custom_step_progress.dart';
 import '../widgets/setup_header.dart';
 import '../widgets/time_wheel_picker.dart';
@@ -35,20 +38,8 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
   bool _isDateOpen = false;
   bool _isTimeOpen = false;
 
-  static const _months = [
-    'يناير',
-    'فبراير',
-    'مارس',
-    'أبريل',
-    'مايو',
-    'يونيو',
-    'يوليو',
-    'أغسطس',
-    'سبتمبر',
-    'أكتوبر',
-    'نوفمبر',
-    'ديسمبر',
-  ];
+  // أسماء الأشهر حسب لغة التطبيق
+  List<String> get _months => [for (final month in DepartureText.months) month()];
 
   bool get _isIOS => Theme.of(context).platform == TargetPlatform.iOS;
 
@@ -59,13 +50,13 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
 
   String get _dateText {
     final d = _arrivalDate;
-    if (d == null) return 'تاريخ الوصول';
+    if (d == null) return DepartureText.arrivalDate();
     return '${d.day} ${_months[d.month - 1]} ${d.year}';
   }
 
   String get _timeText {
     final t = _arrivalTime;
-    if (t == null) return 'اختر وقت الوصول';
+    if (t == null) return DepartureText.chooseArrivalTime();
     final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
     final m = t.minute.toString().padLeft(2, '0');
     return '$h:$m ${t.period == DayPeriod.am ? 'am' : 'pm'}';
@@ -127,6 +118,12 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
 
   void _onNextPressed() {
     setState(_commitPendingTime);
+    // الموعد بينحفظ مع باقي الرحلة لما يخلص الإعداد
+    final time = _arrivalTime;
+    TripSetupData.instance
+      ..departureDate = _arrivalDate
+      ..departureMinute = time == null ? null : time.hour * 60 + time.minute
+      ..departureNotDecided = _notDecidedYet;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const StayLocationScreen()),
@@ -140,7 +137,7 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const SetupHeader(title: 'متى ستنطلق في رحلتك إلى مكة؟'),
+            SetupHeader(title: DepartureText.title()),
             // Slider (369×42)
             const SizedBox(
               height: 42,
@@ -156,7 +153,7 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'يرجى إدخال تاريخ ووقت انطلاقك لنتمكن من تنبيهك بخطوات الإحرام في الوقت المناسب.',
+                      DepartureText.description(),
                       style: GoogleFonts.tajawal(
                         fontSize: 13,
                         color: _black,
@@ -166,7 +163,7 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
 
                     // ---------- التاريخ ----------
                     _labelSlot(
-                      'اختر تاريخ الوصول',
+                      DepartureText.chooseArrivalDate(),
                       visible: _isDateOpen || _isTimeOpen,
                       color: _isDateOpen ? _accent : _black,
                     ),
@@ -186,7 +183,7 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
                     if (!_isDateOpen) ...[
                       const SizedBox(height: 5),
                       _labelSlot(
-                        'وقت الوصول المتوقع',
+                        DepartureText.expectedArrivalTime(),
                         visible: _isTimeOpen,
                         color: _black,
                       ),
@@ -208,7 +205,7 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
                         _notDecidedRow(),
                         const SizedBox(height: 26),
                         Text(
-                          'يمكنك تعديل الموعد لاحقًا إذا تغيّرت خطتك.',
+                          DepartureText.canChangeLater(),
                           style: GoogleFonts.tajawal(
                             fontSize: 12,
                             color: _accent,
@@ -231,7 +228,7 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
                           ),
                         ),
                         child: Text(
-                          'التالي',
+                          CommonText.next(),
                           style: GoogleFonts.tajawal(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -382,7 +379,7 @@ class _DepartureDateTimeScreenState extends State<DepartureDateTimeScreen> {
         ),
         const SizedBox(width: 8),
         Text(
-          'لم أحدد موعد الوصول بعد',
+          DepartureText.arrivalNotDecided(),
             style: GoogleFonts.tajawal(fontSize: 12, color: Color(0xFF000000)),
         ),
       ],

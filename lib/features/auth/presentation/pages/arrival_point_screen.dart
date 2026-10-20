@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../data/sources/arrival_points.dart';
+import '../../../../core/l10n/common_text.dart';
 import '../../data/models/trip_setup_data.dart';
+import '../../data/sources/arrival_points.dart';
+import '../l10n/arrival_point_text.dart';
 import '../widgets/custom_step_progress.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/setup_dropdown.dart';
@@ -25,7 +27,7 @@ class _ArrivalPointScreenState extends State<ArrivalPointScreen> {
   void _onNextPressed() {
     if (_data.arrivalPlace == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء اختيار نقطة الوصول أولاً')),
+        SnackBar(content: Text(ArrivalPointText.chooseFirst())),
       );
       return;
     }
@@ -48,7 +50,7 @@ class _ArrivalPointScreenState extends State<ArrivalPointScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const SetupHeader(title: 'ما نقطة وصولك؟'),
+            SetupHeader(title: ArrivalPointText.title()),
             const SizedBox(
               height: 42,
               child: Padding(
@@ -63,20 +65,20 @@ class _ArrivalPointScreenState extends State<ArrivalPointScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'اختر نقطة وصولك إلى السعودية.',
+                      ArrivalPointText.description(),
                       style: GoogleFonts.tajawal(fontSize: 13, color: const Color(0xFF000000)),
                     ),
                     const SizedBox(height: 18),
                     Center(
                       child: SetupDropdown(
-                        hint: 'ابحث عن وجهتك الاولى',
+                        hint: ArrivalPointText.search(),
                         value: exists ? _data.arrivalPlace : null,
                         groups: groups,
                         onChanged: (v) => setState(() => _data.arrivalPlace = v),
                       ),
                     ),
                     const SizedBox(height: 31),
-                    PrimaryButton(label: 'التالي', onPressed: _onNextPressed),
+                    PrimaryButton(label: CommonText.next(), onPressed: _onNextPressed),
                   ],
                 ),
               ),

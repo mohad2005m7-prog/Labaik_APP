@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/utils/location_service.dart';
 import '../../data/models/trip_setup_data.dart';
+import '../l10n/location_permission_text.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/setup_header.dart';
 import 'prepare_trip_screen.dart';
@@ -12,9 +14,11 @@ import 'prepare_trip_screen.dart';
 class LocationPermissionScreen extends StatelessWidget {
   const LocationPermissionScreen({super.key});
 
-  void _goNext(BuildContext context, {required bool enable}) {
-    TripSetupData.instance.locationEnabled = enable;
-    // TODO: طلب صلاحية الموقع الفعلية من النظام (geolocator / permission_handler)
+  Future<void> _goNext(BuildContext context, {required bool enable}) async {
+    // "تفعيل الموقع" بيطلب صلاحية الموقع من النظام (وبنكمل حتى لو رفض — الخريطة بتطلبها مرة ثانية)
+    final access = enable ? await LocationService.requestAccess() : null;
+    TripSetupData.instance.locationEnabled = access == LocationAccess.granted;
+    if (!context.mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const PrepareTripScreen()),
@@ -28,7 +32,7 @@ class LocationPermissionScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            const SetupHeader(title: 'فعّل موقعك'),
+            SetupHeader(title: LocationPermissionText.title()),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
@@ -36,7 +40,7 @@ class LocationPermissionScreen extends StatelessWidget {
                   children: [
                     // الوصف (361×66)
                     Text(
-                      'يساعدك لبيك على معرفة موقعك، الوصول إلى فندقك ومجموعتك، واستخدام الخريطة والمساعدة عند الحاجة.',
+                      LocationPermissionText.description(),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.tajawal(
                         fontSize: 16,
@@ -54,12 +58,12 @@ class LocationPermissionScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 33),
                     PrimaryButton(
-                      label: 'تفعيل الموقع',
+                      label: LocationPermissionText.enable(),
                       onPressed: () => _goNext(context, enable: true),
                     ),
                     const SizedBox(height: 26),
                     PrimaryButton(
-                      label: 'لاحقًا',
+                      label: LocationPermissionText.later(),
                       outlined: true,
                       onPressed: () => _goNext(context, enable: false),
                     ),

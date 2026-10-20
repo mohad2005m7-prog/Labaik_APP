@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../widgets/custom_step_progress.dart';
-import '../../data/sources/saudi_cities.dart';
+import '../../../../core/l10n/common_text.dart';
 import '../../data/models/trip_setup_data.dart';
+import '../../data/sources/saudi_cities.dart';
+import '../l10n/trip_route_text.dart';
+import '../widgets/custom_step_progress.dart';
 import 'departure_datetime_screen.dart';
 
 // -------------------------------------------------------------
@@ -71,7 +73,7 @@ class _TripRouteScreenState extends State<TripRouteScreen> {
 
               // العنوان (Header ~ 24)
               Text(
-                'ما مسار رحلتك؟',
+                TripRouteText.title(),
                 style: GoogleFonts.tajawal(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -81,7 +83,7 @@ class _TripRouteScreenState extends State<TripRouteScreen> {
               const SizedBox(height: 12),
               // الوصف (Body ~ 13)
               Text(
-                'أضف المدن التي ستزورها بالترتيب لنساعدك في التنقل والاستعداد لكل مرحلة من رحلتك.',
+                TripRouteText.description(),
                 style: GoogleFonts.tajawal(
                   fontSize: 13,
                   color: Colors.grey.shade600,
@@ -90,19 +92,19 @@ class _TripRouteScreenState extends State<TripRouteScreen> {
               ),
               const SizedBox(height: 28),
 
-              _buildFieldLabel('المحطة الأولى'),
+              _buildFieldLabel(TripRouteText.firstStop()),
               const SizedBox(height: 8),
               _buildDropdown(
-                hint: 'ابحث عن وجهتك الاولى',
+                hint: TripRouteText.searchFirst(),
                 value: _firstDestination,
                 onChanged: (val) => setState(() => _firstDestination = val),
               ),
               const SizedBox(height: 18),
 
-              _buildFieldLabel('المحطة التالية'),
+              _buildFieldLabel(TripRouteText.nextStop()),
               const SizedBox(height: 8),
               _buildDropdown(
-                hint: 'ابحث عن وجهتك التالية',
+                hint: TripRouteText.searchNext(),
                 value: _secondDestination,
                 onChanged: (val) => setState(() => _secondDestination = val),
               ),
@@ -119,7 +121,7 @@ class _TripRouteScreenState extends State<TripRouteScreen> {
                       const Icon(Icons.add, size: 18, color: _green),
                       const SizedBox(width: 6),
                       Text(
-                        'إضافة محطة',
+                        TripRouteText.addStop(),
                         style: GoogleFonts.tajawal(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -146,7 +148,7 @@ class _TripRouteScreenState extends State<TripRouteScreen> {
                     ),
                   ),
                   child: Text(
-                    'التالي',
+                    CommonText.next(),
                     style: GoogleFonts.tajawal(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -181,7 +183,7 @@ class _TripRouteScreenState extends State<TripRouteScreen> {
         Padding(
           padding: const EdgeInsets.only(bottom: 14),
           child: _buildDropdown(
-            hint: 'ابحث عن وجهتك التالية',
+            hint: TripRouteText.searchNext(),
             value: _extraStops[i],
             onChanged: (val) => setState(() => _extraStops[i] = val),
           ),

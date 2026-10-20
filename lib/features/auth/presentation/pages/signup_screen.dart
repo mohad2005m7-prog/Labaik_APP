@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import '../../../../core/theme/figma_text.dart';
 import '../controllers/auth_controller.dart';
+import '../controllers/google_sign_in_controller.dart';
+import '../l10n/auth_form_text.dart';
+import '../l10n/signup_text.dart';
+import '../widgets/auth_icons.dart';
+import '../widgets/auth_widgets.dart';
 import 'login_screen.dart';
 
+// -------------------------------------------------------------
+// 6.SignUp — مطابقة لـ Figma (18:893)
+// الاسم، البريد، رقم الهاتف، كلمة المرور + الموافقة على الشروط ← إنشاء حساب ← رمز التحقق ← نوع الحساب
+// -------------------------------------------------------------
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -11,229 +22,120 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _confirm = TextEditingController();
+  final _password = TextEditingController();
+  bool _acceptedTerms = false;
+  bool _loading = false;
 
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-  bool _isLoading = false;
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    for (final c in [_name, _email, _password, _confirm]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  void _onRegisterPressed() {
-    if (!_formKey.currentState!.validate()) return;
+  // أول خطأ بيطلع برسالة (Figma ما فيه مكان لرسائل تحت الحقول)
+  String? _error() {
+    final name = _name.text.trim();
+    if (name.isEmpty) return SignupText.enterFullName();
+    if (name.length < 3) return SignupText.invalidFullName();
+    if (_email.text.trim().isEmpty) return AuthFormText.enterEmail();
+    if (!_emailPattern.hasMatch(_email.text.trim())) return AuthFormText.invalidEmail();
+    if (_password.text.isEmpty) return AuthFormText.enterPassword();
+    if (_password.text.length < 6) return SignupText.invalidPassword();
+    if (_confirm.text != _password.text) return SignupText.passwordsMismatch();
+    if (!_acceptedTerms) return SignupText.acceptTerms();
+    return null;
+  }
 
-    if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('كلمتا المرور غير متطابقتين')),
-      );
+  void _submit() {
+    FocusScope.of(context).unfocus();
+    final error = _error();
+    if (error != null) {
+      AuthController.showMessage(context, error);
       return;
     }
-
     AuthController.register(
       context: context,
-      fullName: _nameController.text.trim(),
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      setLoading: (val) => setState(() => _isLoading = val),
+      fullName: _name.text.trim(),
+      email: _email.text.trim(),
+      password: _password.text,
+      setLoading: (value) => setState(() => _loading = value),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 20),
-                Image.asset(
-                  'assets/images/Logo.png',
-                  height: 120,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.mosque, size: 100, color: Color(0xFF1B3B2B)),
-                ),
-                const SizedBox(height: 24),
-
-                const Text(
-                  'إنشاء حساب جديد',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1B3B2B),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // 1. حقل الاسم كامل (دعم اللغة العربية والإنجليزية)
-                TextFormField(
-                  controller: _nameController,
-                  textAlign: TextAlign.right,
-                  keyboardType: TextInputType.name,
-                  inputFormatters: [
-                    // السماح فقط بالحروف العربية والإنجليزية والمسافات
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'[\u0600-\u06FFa-zA-Z\s]'),
-                    ),
-                  ],
-                  decoration: InputDecoration(
-                    hintText: 'الاسم كامل',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'يرجى إدخال الاسم كامل';
-                    }
-                    if (val.trim().length < 3) {
-                      return 'يجب أن يحتوي الاسم على 3 أحرف على الأقل';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // 2. حقل البريد الإلكتروني
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textAlign: TextAlign.right,
-                  decoration: InputDecoration(
-                    hintText: 'البريد الالكتروني',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'يرجى إدخال البريد الإلكتروني';
-                    if (!val.contains('@')) return 'بريد إلكتروني غير صالح';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // 3. حقل كلمة السر
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  textAlign: TextAlign.right,
-                  decoration: InputDecoration(
-                    hintText: 'كلمة السر',
-                    prefixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                      ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.isEmpty) return 'يرجى إدخال كلمة السر';
-                    if (val.length < 6) return 'كلمة السر يجب أن تكون 6 خانات على الأقل';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // 4. حقل تأكيد كلمة السر
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: _obscureConfirmPassword,
-                  textAlign: TextAlign.right,
-                  decoration: InputDecoration(
-                    hintText: 'تأكيد كلمة السر',
-                    prefixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.isEmpty) return 'يرجى تأكيد كلمة السر';
-                    if (val != _passwordController.text) return 'كلمتا المرور غير متطابقتين';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 28),
-
-                // زر إنشاء حساب
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _onRegisterPressed,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1B3B2B),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            'إنشاء حساب',
-                            style: TextStyle(fontSize: 16, color: Colors.white),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // رابط تسجيل الدخول
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        );
-                      },
-                      child: const Text(
-                        'تسجيل الدخول',
-                        style: TextStyle(
-                          color: Color(0xFF1B3B2B),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const Text(' هل لديك حساب بالفعل؟ '),
-                  ],
-                ),
-              ],
+    return AuthPage(
+      builder: (c) {
+        final s = c.s;
+        Widget field(double top, TextEditingController controller, String hint, Widget icon, {bool password = false, TextInputType? type, List<TextInputFormatter>? formatters, Iterable<String>? autofill, bool last = false}) {
+          return c.rect(
+            left: 17,
+            top: top,
+            width: 360,
+            height: 46,
+            child: AuthField(
+              s: s,
+              controller: controller,
+              hint: hint,
+              icon: icon,
+              password: password,
+              keyboardType: type,
+              inputFormatters: formatters,
+              autofillHints: autofill,
+              textInputAction: last ? TextInputAction.done : TextInputAction.next,
             ),
+          );
+        }
+
+        final grey = authText(c, 15, FigmaWeight.sfRegular, AuthColors.grey);
+        return [
+          authBack(c, context),
+          authLogo(c, left: 139.97, top: 104),
+          authTitle(c, SignupText.title(), left: 101, top: 261, width: 191),
+
+          field(321, _name, SignupText.fullName(), authPersonIcon(s), type: TextInputType.name, formatters: [FilteringTextInputFormatter.allow(RegExp(r'[؀-ۿa-zA-Z\s]'))], autofill: const [AutofillHints.name]),
+          field(383, _email, AuthFormText.email(), AuthIconView(AuthIcon.mail, size: s.x(24), color: AuthColors.grey), type: TextInputType.emailAddress, autofill: const [AutofillHints.email]),
+          // بدل رقم الهاتف (طلب صاحب المشروع): كلمة المرور وتحتها تأكيدها
+          field(445, _password, AuthFormText.password(), AuthIconView(AuthIcon.lock, size: s.x(24), color: AuthColors.grey), password: true, autofill: const [AutofillHints.newPassword]),
+          field(507, _confirm, SignupText.confirmPassword(), AuthIconView(AuthIcon.lock, size: s.x(24), color: AuthColors.grey), password: true, autofill: const [AutofillHints.newPassword], last: true),
+
+          // أوافق على الشروط والأحكام (Frame 438: المربع 24 بالبداية والنص بعده بـ 7)
+          c.rect(left: 350.62, top: 567.5, width: 24, height: 24, child: AuthCheckbox(s: s, value: _acceptedTerms, onChanged: (v) => setState(() => _acceptedTerms = v))),
+          c.rich(
+            TextSpan(children: [
+              TextSpan(text: SignupText.agreeTo(), style: grey),
+              TextSpan(text: SignupText.terms(), style: authText(c, 15, FigmaWeight.sfBold, AuthColors.green)),
+            ]),
+            left: 154,
+            top: 568,
+            width: 189.62,
+            height: 22,
+            dy: 0,
           ),
-        ),
-      ),
+          c.tapArea(left: 154, top: 565, width: 196, height: 29, onTap: () => setState(() => _acceptedTerms = !_acceptedTerms)),
+
+          authButton(c, SignupText.createAccount(), left: 16, top: 606, loading: _loading, onTap: _submit),
+          ...authOrDivider(c, AuthFormText.or(), top: 664),
+          authGoogleButton(c, top: 694, onTap: () => GoogleSignInController.signIn(context, newAccount: true, setLoading: (value) => setState(() => _loading = value))),
+
+          authLinkLine(
+            c,
+            text: '${SignupText.haveAccount()} ',
+            link: SignupText.login(),
+            left: 65,
+            top: 756,
+            width: 255,
+            onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
+          ),
+        ];
+      },
     );
   }
 }

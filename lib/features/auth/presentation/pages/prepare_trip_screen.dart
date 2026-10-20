@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../l10n/prepare_trip_text.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/setup_header.dart';
 import 'arrival_method_screen.dart';
@@ -17,11 +18,11 @@ class PrepareTripScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const items = [
-      '✓ تفاصيل وصولك',
-      '✓ مكان إقامتك',
-      '✓ إرشادات لمسار رحلتك',
-      '✓ تجربة تناسب احتياجاتك',
+    final items = [
+      PrepareTripText.itemArrival(),
+      PrepareTripText.itemStay(),
+      PrepareTripText.itemRoute(),
+      PrepareTripText.itemExperience(),
     ];
 
     return Scaffold(
@@ -29,7 +30,7 @@ class PrepareTripScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            const SetupHeader(title: 'خلّينا نجهّز رحلتك'),
+            SetupHeader(title: PrepareTripText.title()),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -45,14 +46,14 @@ class PrepareTripScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     // النص (361×44)
                     Text(
-                      'سنسألك عن بعض تفاصيل رحلتك لنقدّم لك إرشادات مناسبة من لحظة وصولك وحتى أداء المناسك.',
+                      PrepareTripText.description(),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.tajawal(fontSize: 14, fontWeight: FontWeight.w500, color: _black, height: 1.4),
                     ),
                     const SizedBox(height: 18),
                     // (205×20)
                     Text(
-                      'لن يستغرق الأمر سوى بضع دقائق.',
+                      PrepareTripText.note(),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.tajawal(fontSize: 12, color: const Color(0xFF717171)),
                     ),
@@ -80,7 +81,7 @@ class PrepareTripScreen extends StatelessWidget {
                             height: 20,
                             child: Center(
                               child: Text(
-                                'ما الذي سنجهزه لك؟',
+                                PrepareTripText.listTitle(),
                                 style: GoogleFonts.tajawal(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
@@ -103,7 +104,7 @@ class PrepareTripScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 33),
                     PrimaryButton(
-                      label: 'لنبدأ',
+                      label: PrepareTripText.letsStart(),
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const ArrivalMethodScreen()),

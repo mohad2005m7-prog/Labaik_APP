@@ -1,259 +1,171 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../controllers/auth_controller.dart';
 
+import '../../../../core/theme/figma_text.dart';
+import '../../../../core/utils/design_scale.dart';
+import '../../../../core/utils/figma_canvas.dart';
+import '../controllers/auth_controller.dart';
+import '../l10n/verification_text.dart';
+import '../widgets/auth_widgets.dart';
+
+// -------------------------------------------------------------
+// 7.Write Code — مطابقة لـ Figma (18:1023)
+// 6 مربعات للرمز (الكيبورد بيفتح لحاله) — "إعادة إرسال الرمز خلال 55 ثانية" — تأكيد
+// إنشاء حساب → نوع الحساب | نسيت كلمة المرور → كلمة المرور الجديدة
+// -------------------------------------------------------------
 class VerificationCodeScreen extends StatefulWidget {
   final String email;
   final bool isPasswordReset;
 
-  const VerificationCodeScreen({
-    super.key,
-    required this.email,
-    this.isPasswordReset = false,
-  });
+  const VerificationCodeScreen({super.key, required this.email, this.isPasswordReset = false});
 
   @override
   State<VerificationCodeScreen> createState() => _VerificationCodeScreenState();
 }
 
 class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  static const _length = 6;
+  static const _resendSeconds = 55;
 
-  bool _isLoading = false;
-
-  // إدارة المؤقت (Timer)
+  final _code = TextEditingController();
+  final _focus = FocusNode();
   Timer? _timer;
-  int _secondsRemaining = 55; // مطابقة للوقت الظاهر في التصميم
-  bool _canResend = false;
+  int _secondsLeft = _resendSeconds;
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
+    _code.addListener(() => setState(() {}));
+    _focus.addListener(() => setState(() {}));
     _startTimer();
-    // إضافة مستمعين لإعادة بناء الواجهة لتحديث شكل المربعات عند التركيز/الكتابة
-    for (int i = 0; i < 6; i++) {
-      _focusNodes[i].addListener(() => setState(() {}));
-      _controllers[i].addListener(() => setState(() {}));
-    }
   }
 
   void _startTimer() {
-    setState(() {
-      _secondsRemaining = 55;
-      _canResend = false;
-    });
-
     _timer?.cancel();
+    setState(() => _secondsLeft = _resendSeconds);
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_secondsRemaining > 0) {
-        setState(() {
-          _secondsRemaining--;
-        });
-      } else {
-        setState(() {
-          _canResend = true;
-        });
-        timer.cancel();
-      }
+      if (_secondsLeft <= 1) timer.cancel();
+      setState(() => _secondsLeft--);
     });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    for (var controller in _controllers) {
-      controller.dispose();
-    }
-    for (var focusNode in _focusNodes) {
-      focusNode.dispose();
-    }
+    _code.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
-  String get _otpCode => _controllers.map((c) => c.text).join();
-
-  void _onVerifyPressed() {
-    final code = _otpCode;
-
-    if (code.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'يرجى إدخال رمز التحقق كاملاً (6 أرقام)',
-            style: TextStyle(fontFamily: 'Tajawal'),
-          ),
-        ),
-      );
+  void _verify() {
+    if (_code.text.length < _length) {
+      AuthController.showMessage(context, VerificationText.enterFullCode());
       return;
     }
-
+    FocusScope.of(context).unfocus();
     AuthController.verifyEmail(
       context: context,
       email: widget.email,
-      code: code,
+      code: _code.text,
       isPasswordReset: widget.isPasswordReset,
-      setLoading: (val) => setState(() => _isLoading = val),
+      setLoading: (value) => setState(() => _loading = value),
     );
   }
 
-  void _onResendPressed() {
-    if (!_canResend) return;
-
+  void _resend() {
     AuthController.resendCode(context, widget.email);
     _startTimer();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF1B3B2B), size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 10.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+    return AuthPage(
+      builder: (c) {
+        final green = AuthColors.green;
+        return [
+          authBack(c, context),
+          authLogo(c, left: 148.97, top: 110),
+          authTitle(c, VerificationText.title(), left: 130, top: 261, width: 142),
+          // Frame 50: "أدخل رمز التحقق" ثم الوصف (#4C7A75) تحته بـ 14
+          c.text(VerificationText.subtitle(), left: 63, top: 312, width: 280, height: 24, align: TextAlign.center, dy: 0, style: authText(c, 20, FigmaWeight.sfBold, green)),
+          c.text(VerificationText.description(), left: 63, top: 350, width: 280, height: 38, align: TextAlign.center, dy: 0, style: authText(c, 16, FigmaWeight.sfRegular, AuthColors.teal)),
+
+          ..._boxes(c),
+
+          // "إعادة إرسال الرمز خلال 55 ثانية" — SF Compact 457 17 والثواني 656 — وبعد ما تخلص: رابط "إعادة إرسال الرمز"
+          if (_secondsLeft > 0)
+            c.rich(
+              TextSpan(children: [
+                TextSpan(text: VerificationText.resendIn(), style: authText(c, 17, FigmaWeight.sfRegular, green)),
+                TextSpan(text: VerificationText.seconds(_secondsLeft), style: authText(c, 17, FigmaWeight.sfSemibold, green)),
+              ]),
+              left: 94,
+              top: 487,
+              width: 204,
+              height: 22,
+              align: TextAlign.center,
+              dy: 0,
+            )
+          else ...[
+            c.text(VerificationText.resendCode(), left: 94, top: 487, width: 204, height: 22, align: TextAlign.center, dy: 0, style: authText(c, 17, FigmaWeight.sfSemibold, green)),
+            c.tapArea(left: 94, top: 480, width: 204, height: 36, onTap: _resend),
+          ],
+
+          authButton(c, VerificationText.confirm(), left: 17, top: 533, width: 359, loading: _loading, onTap: _verify),
+        ];
+      },
+    );
+  }
+
+  // 6 مربعات 48×48 كل 56 (Frame 24) — الأرقام على رمادي #EEEEEF، وآخر رقم مكتوب (المربع اللي عليه الدور) أبيض بحد
+  // الترتيب من اليسار لليمين باللغتين (الأرقام بتنكتب LTR)
+  List<Widget> _boxes(FigmaCanvas c) {
+    final s = c.s;
+    final text = _code.text;
+    // الأرقام بخط النظام العريض (SF بالآيفون و Roboto بالأندرويد — زي Figma)
+    final digitStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: s.x(24), color: Colors.black, height: 1);
+    return [
+      c.rect(
+        left: 22,
+        top: 419,
+        width: 348,
+        height: 68,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _focus.requestFocus(),
+          child: Stack(
             children: [
-              const SizedBox(height: 30),
-
-              // العنوان الرئيسي (خط Tajawal غامق)
-              const Text(
-                'رمز التحقق',
-                style: TextStyle(
-                  fontFamily: 'Tajawal',
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1B3B2B),
+              // الحقل الفعلي (مخفي) — بيستقبل الكتابة واللصق
+              Opacity(
+                opacity: 0,
+                child: TextField(
+                  controller: _code,
+                  focusNode: _focus,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.oneTimeCode],
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(_length)],
+                  onSubmitted: (_) => _verify(),
+                  showCursor: false,
+                  enableInteractiveSelection: false,
+                  decoration: const InputDecoration.collapsed(hintText: ''),
                 ),
               ),
-              const SizedBox(height: 12),
-
-              // الوصف المنسق
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                child: Text(
-                  'أدخل الرمز المكون من 6 أرقام الذي تم إرساله إلى البريد الإلكتروني المسجل.\n(${widget.email})',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 14,
-                    color: Color(0xFF8A92A6),
-                    height: 1.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // مربعات إدخال الرمز (6 مربعات بتصميم Figma)
               Directionality(
                 textDirection: TextDirection.ltr,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(6, (index) {
-                    final isFocused = _focusNodes[index].hasFocus;
-                    final isFilled = _controllers[index].text.isNotEmpty;
-                    final isActive = isFocused || isFilled;
-
-                    return Container(
-                      width: 48,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: isActive ? Colors.white : const Color(0xFFF2F4F7),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isActive ? const Color(0xFF1B3B2B) : Colors.transparent,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: TextFormField(
-                        controller: _controllers[index],
-                        focusNode: _focusNodes[index],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontFamily: 'Tajawal',
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1B3B2B),
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(1),
-                        ],
-                        decoration: const InputDecoration(
-                          counterText: '',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onChanged: (value) {
-                          if (value.isNotEmpty) {
-                            if (index < 5) {
-                              FocusScope.of(context).requestFocus(_focusNodes[index + 1]);
-                            } else {
-                              _focusNodes[index].unfocus();
-                            }
-                          } else {
-                            if (index > 0) {
-                              FocusScope.of(context).requestFocus(_focusNodes[index - 1]);
-                            }
-                          }
-                        },
-                      ),
-                    );
-                  }),
-                ),
-              ),
-              const SizedBox(height: 36),
-
-              // زر تأكيد الرمز
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _onVerifyPressed,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1B3B2B),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'تأكيد',
-                          style: TextStyle(
-                            fontFamily: 'Tajawal',
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // نص وحالة العداد / إعادة الإرسال
-              GestureDetector(
-                onTap: _canResend ? _onResendPressed : null,
-                child: Text(
-                  _canResend
-                      ? 'إعادة إرسال الرمز'
-                      : 'إعادة إرسال الرمز خلال $_secondsRemaining ثانية',
-                  style: TextStyle(
-                    fontFamily: 'Tajawal',
-                    color: _canResend ? const Color(0xFF1B3B2B) : const Color(0xFF1B3B2B),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: s.x(10), vertical: s.y(10)),
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < _length; i++) ...[
+                        if (i > 0) SizedBox(width: s.x(8)),
+                        Expanded(child: _box(s, i < text.length ? text[i] : null, active: _focus.hasFocus && i == (text.isEmpty ? 0 : text.length - 1), style: digitStyle)),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -261,6 +173,19 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
           ),
         ),
       ),
+    ];
+  }
+
+  Widget _box(DesignScale s, String? digit, {required bool active, required TextStyle style}) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: active ? Colors.white : AuthColors.codeFill,
+        borderRadius: BorderRadius.circular(s.x(10)),
+        border: active ? Border.all(color: AuthColors.teal, width: s.x(1)) : null,
+      ),
+      child: digit == null ? null : Text(digit, style: style),
     );
   }
 }

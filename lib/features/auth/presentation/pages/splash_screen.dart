@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'onboarding_screen.dart';
+
+import '../controllers/auth_controller.dart';
 
 // 1. شاشة البداية (Splash Screen)
+// بعد 3 ثواني بتفتح الشاشة المناسبة حسب التقدم المحفوظ (شوف AuthController.initialScreen):
+// حساب مسجّل → الرئيسية | شاف الترحيب → اختيار اللغة/الدخول | أول مرة → شاشات الترحيب
 // -------------------------------------------------------------
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,14 +17,19 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
-        );
-      }
-    });
+    _openNextScreen();
+  }
+
+  Future<void> _openNextScreen() async {
+    final results = await Future.wait<Object?>([
+      AuthController.initialScreen(),
+      Future.delayed(const Duration(seconds: 3)),
+    ]);
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => results.first! as Widget),
+    );
   }
 
   @override

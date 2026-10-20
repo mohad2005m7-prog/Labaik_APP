@@ -1,13 +1,88 @@
 import 'package:flutter/material.dart';
-import '../../data/auth_api_service.dart';
+
+import '../../../../core/utils/app_preferences.dart';
 import '../../../../core/utils/token_storage.dart';
-import '../pages/account_type_screen.dart';
+import '../../../company/presentation/pages/company_shell.dart';
+import '../../../supervisor/data/sources/supervisor_local_source.dart';
+import '../../../supervisor/presentation/pages/supervisor_shell.dart';
+import '../../../trip_details/data/models/trip_setup_mapper.dart';
+import '../../../trip_details/data/repositories/trip_repository_impl.dart';
+import '../../data/account_registry.dart';
+import '../../data/auth_api_service.dart';
+import '../../data/auth_session.dart';
+import '../../data/models/account_type.dart';
+import '../../data/models/trip_setup_data.dart';
+import '../../data/token_refresher.dart';
+import '../l10n/auth_messages_text.dart';
+import '../pages/auth_welcome_screen.dart';
 import '../pages/create_new_password_screen.dart';
-import '../pages/login_screen.dart';
-import '../pages/verification_code_screen.dart';
 import '../pages/home_screen.dart';
+import '../pages/login_screen.dart';
+import '../pages/onboarding_screen.dart';
+import '../pages/trip_type_screen.dart';
+import '../pages/verification_code_screen.dart';
 
 class AuthController {
+  // 0. أول شاشة بعد السبلاش (حفظ التقدم):
+  // - مسجّل دخول (توكن محفوظ من إنشاء الحساب أو تسجيل الدخول) → حسابه مباشرة
+  // - شاف شاشات الترحيب قبل → اختيار اللغة (لو لسا ما اختار) أو شاشة الدخول/إنشاء الحساب
+  // - أول مرة بيفتح التطبيق → شاشات الترحيب
+  static Future<Widget> initialScreen() async {
+    final token = await TokenStorage.getAccessToken();
+    if (token != null && token.isNotEmpty) return await homeScreen() ?? const AuthWelcomeScreen();
+    if (!await AppPreferences.isOnboardingSeen()) return const OnboardingScreen();
+    return const AuthWelcomeScreen();
+  }
+
+  // وين بيفتح الحساب (حفظ التقدم — AccountRegistry):
+  // - لسا ما اختار نوع حسابه بعد إنشائه → "نوع الحساب" | معتمر بنص إعداد رحلته → إعداد الرحلة
+  // - مشرف المجموعة → واجهة المشرف (آخر تبويب كان فيه) | معتمر → رئيسية المعتمر
+  // - الشركة → واجهة الشركة
+  // - نوعه مش معروف (لا بالجهاز ولا بالسيرفر) → رئيسية المعتمر
+  static Future<Widget?> homeScreen() async {
+    final account = await AccountRegistry.current(askServer: true);
+    // السوبر أدمن: لوحة التحكم على الويب بس — ما بيضل داخل بالتطبيق
+    if (account?.type == AccountType.superAdmin) {
+      await TokenStorage.clearTokens();
+      await AuthSession.clear();
+      return null;
+    }
+    switch (account?.setup) {
+      case AccountSetup.tripSetup:
+        return const TripTypeScreen();
+      case AccountSetup.done when account!.type == AccountType.groupSupervisor:
+        return SupervisorShell(initialTab: await SupervisorLocalSource().lastTab());
+      case AccountSetup.done when account!.type == AccountType.company:
+        return const CompanyShell();
+      case AccountSetup.done:
+      case null:
+        return const HomeScreen();
+    }
+  }
+
+  /// رسالة سريعة تحت الشاشة
+  static void showMessage(BuildContext context, String text) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  // آخر خطوة بإعداد رحلة المعتمر → بتنحفظ رحلته (لشاشة "تفاصيل الرحلة") → رئيسيته (وما بترجعله شاشات الإعداد بعدها)
+  static Future<void> finishTripSetup(BuildContext context) async {
+    await TripRepositoryImpl().save(TripSetupData.instance.toTrip());
+    await AccountRegistry.finishSetup();
+    if (!context.mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
+  }
+
+  // تجديد الـ accessToken بالـ refreshToken المحفوظ لما ينتهي (حتى يضل المستخدم داخل حسابه)
+  // بيرجع التوكن الجديد، أو null لو ما زبط
+  static Future<String?> refreshAccessToken() => TokenRefresher.refresh();
+
   // 1. تسجيل الدخول
   static Future<void> login({
     required BuildContext context,
@@ -21,8 +96,6 @@ class AuthController {
         email: email,
         password: password,
       );
-      setLoading(false);
-      if (!context.mounted) return;
 
       if (response.statusCode == 200) {
         // حفظ التوكن محلياً حتى تقدر شاشة الـ Home تجيب بيانات المستخدم
@@ -31,23 +104,35 @@ class AuthController {
           accessToken: tokens['accessToken'],
           refreshToken: tokens['refreshToken'],
         );
+        // user.roles وبيانات المستخدم مع التوكن
+        await AuthSession.saveFromResponse(response.body);
+        await AccountRegistry.signedIn(email);
 
+        // واجهته حسب نوع حسابه هو (مشرف / معتمر / شركة) — من الحسابات المسجلة أو السيرفر
+        final home = await homeScreen();
+        setLoading(false);
         if (!context.mounted) return;
+        if (home == null) {
+          showMessage(context, AuthMessagesText.dashboardOnly());
+          return;
+        }
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => home),
           (route) => false,
         );
       } else {
+        setLoading(false);
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('بيانات الدخول غير صحيحة')),
+          SnackBar(content: Text(AuthMessagesText.loginInvalid())),
         );
       }
     } catch (e) {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ: $e')),
+        SnackBar(content: Text('${AuthMessagesText.errorPrefix()}$e')),
       );
     }
   }
@@ -79,14 +164,14 @@ class AuthController {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('حدث خطأ أثناء إنشاء الحساب')),
+          SnackBar(content: Text(AuthMessagesText.registerFailed())),
         );
       }
     } catch (e) {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ: $e')),
+        SnackBar(content: Text('${AuthMessagesText.errorPrefix()}$e')),
       );
     }
   }
@@ -125,28 +210,34 @@ class AuthController {
             accessToken: tokens['accessToken'],
             refreshToken: tokens['refreshToken'],
           );
+          await AuthSession.saveFromResponse(response.body);
+          // حساب جديد → بينضاف للحسابات المسجلة، ونوع الحساب اللي رح يختاره بينحفظ إله
+          await AccountRegistry.registered(email);
 
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم تأكيد الحساب بنجاح!')),
+            SnackBar(content: Text(AuthMessagesText.accountVerified())),
           );
 
+          // الحاج بس بيسجّل → إعداد رحلته مباشرة (ما في "نوع الحساب")
+          final home = await homeScreen() ?? const TripTypeScreen();
+          if (!context.mounted) return;
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => const AccountTypeScreen()),
+            MaterialPageRoute(builder: (_) => home),
             (route) => false,
           );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('رمز التحقق غير صحيح، يرجى المحاولة مجدداً')),
+          SnackBar(content: Text(AuthMessagesText.invalidCode())),
         );
       }
     } catch (e) {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ في الاتصال: $e')),
+        SnackBar(content: Text('${AuthMessagesText.connectionErrorPrefix()}$e')),
       );
     }
   }
@@ -158,13 +249,13 @@ class AuthController {
       if (!context.mounted) return;
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم إعادة إرسال الرمز بنجاح')),
+          SnackBar(content: Text(AuthMessagesText.codeResent())),
         );
       }
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر إعادة إرسال الرمز: $e')),
+        SnackBar(content: Text('${AuthMessagesText.resendFailedPrefix()}$e')),
       );
     }
   }
@@ -193,14 +284,14 @@ class AuthController {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('حدث خطأ أثناء إرسال الرمز')),
+          SnackBar(content: Text(AuthMessagesText.sendCodeFailed())),
         );
       }
     } catch (e) {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ: $e')),
+        SnackBar(content: Text('${AuthMessagesText.errorPrefix()}$e')),
       );
     }
   }
@@ -225,7 +316,7 @@ class AuthController {
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم تغيير كلمة المرور بنجاح')),
+          SnackBar(content: Text(AuthMessagesText.passwordChanged())),
         );
         Navigator.pushAndRemoveUntil(
           context,
@@ -234,14 +325,14 @@ class AuthController {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل في إعادة تعيين كلمة المرور')),
+          SnackBar(content: Text(AuthMessagesText.resetFailed())),
         );
       }
     } catch (e) {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ: $e')),
+        SnackBar(content: Text('${AuthMessagesText.errorPrefix()}$e')),
       );
     }
   }

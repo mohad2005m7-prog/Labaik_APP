@@ -1,239 +1,105 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/theme/figma_text.dart';
 import '../controllers/auth_controller.dart';
+import '../l10n/new_password_text.dart';
+import '../widgets/auth_icons.dart';
+import '../widgets/auth_widgets.dart';
 
 // -------------------------------------------------------------
-// شاشة إنشاء كلمة مرور جديدة (Create New Password)
+// 10.Reset Your Password "تغيير كلمة المرور" — مطابقة لـ Figma (87:5963)
+// بعد رمز التحقق: كلمة المرور الجديدة وتأكيدها ← "تحديث كلمة المرور" ← تسجيل الدخول
+// حقل "كلمة المرور الحالية" موجود زي Figma، بس استعادة كلمة المرور بالرمز ما بتحتاجه (فما بنطلبه)
 // -------------------------------------------------------------
 class CreateNewPasswordScreen extends StatefulWidget {
   final String email;
   final String code;
 
-  const CreateNewPasswordScreen({
-    super.key,
-    required this.email,
-    required this.code,
-  });
+  const CreateNewPasswordScreen({super.key, required this.email, required this.code});
 
   @override
-  State<CreateNewPasswordScreen> createState() =>
-      _CreateNewPasswordScreenState();
+  State<CreateNewPasswordScreen> createState() => _CreateNewPasswordScreenState();
 }
 
 class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
+  final _current = TextEditingController();
+  final _newPassword = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _loading = false;
 
-  bool _obscureNewPassword = true;
-  bool _obscureConfirmPassword = true;
-  bool _isLoading = false;
+  // 8 أحرف على الأقل، رقم، وحرف كبير
+  static final _strong = RegExp(r'^(?=.*[0-9])(?=.*[A-Z]).{8,}$');
 
   @override
   void dispose() {
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    for (final c in [_current, _newPassword, _confirm]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _onSavePressed() async {
-    if (!_formKey.currentState!.validate()) return;
-
+  void _update() {
+    FocusScope.of(context).unfocus();
+    final error = _newPassword.text.isEmpty
+        ? NewPasswordText.enterNewPassword()
+        : !_strong.hasMatch(_newPassword.text)
+            ? NewPasswordText.weakPassword()
+            : _confirm.text.isEmpty
+                ? NewPasswordText.enterConfirmPassword()
+                : _confirm.text != _newPassword.text
+                    ? NewPasswordText.passwordsMismatch()
+                    : null;
+    if (error != null) {
+      AuthController.showMessage(context, error);
+      return;
+    }
     AuthController.resetPassword(
       context: context,
       email: widget.email,
       code: widget.code,
-      newPassword: _passwordController.text,
-      setLoading: (val) => setState(() => _isLoading = val),
+      newPassword: _newPassword.text,
+      setLoading: (value) => setState(() => _loading = value),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Color(0xFF1E1E1E),
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
-                Text(
-                  'إنشاء كلمة مرور جديدة',
-                  style: GoogleFonts.tajawal(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1C382B),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'أنشئ كلمة مرور جديدة لحسابك. يرجى اختيار كلمة مرور قوية وسهلة التذكر بالنسبة لك.',
-                  style: GoogleFonts.tajawal(
-                    fontSize: 15,
-                    color: Colors.grey.shade600,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 32),
+    return AuthPage(
+      builder: (c) {
+        final s = c.s;
+        Widget field(double top, TextEditingController controller, String hint, {bool last = false}) => c.rect(
+              left: 16,
+              top: top,
+              width: 360,
+              height: 46,
+              child: AuthField(
+                s: s,
+                controller: controller,
+                hint: hint,
+                icon: AuthIconView(AuthIcon.lock, size: s.x(24), color: AuthColors.grey),
+                password: true,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: last ? TextInputAction.done : TextInputAction.next,
+                onSubmitted: last ? (_) => _update() : null,
+              ),
+            );
+        final note = authText(c, 14, FigmaWeight.sfSemibold, AuthColors.green);
+        return [
+          authBack(c, context),
+          authLogo(c, left: 145, top: 118),
+          authTitle(c, NewPasswordText.title(), left: 107, top: 257, width: 175, align: TextAlign.start),
 
-                // حقل كلمة المرور الجديدة
-                _buildCustomTextField(
-                  controller: _passwordController,
-                  hintText: 'كلمة المرور الجديدة',
-                  obscureText: _obscureNewPassword,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'يرجى إدخال كلمة المرور الجديدة';
-                    }
-                    if (value.length < 6) {
-                      return 'كلمة المرور يجب أن تكون 6 خانات على الأقل';
-                    }
-                    return null;
-                  },
-                  onToggleVisibility: () {
-                    setState(() {
-                      _obscureNewPassword = !_obscureNewPassword;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
+          // Frame 444
+          field(348, _current, NewPasswordText.currentPassword()),
+          c.text(NewPasswordText.forgotPassword(), left: 250, top: 398, width: 126, height: 19, dy: 0, style: note),
+          c.tapArea(left: 250, top: 394, width: 126, height: 30, onTap: () => Navigator.maybePop(context)),
+          field(445, _newPassword, NewPasswordText.newPassword()),
+          c.text(NewPasswordText.rule(), left: 120, top: 496, width: 256, height: 19, dy: 0, style: note),
+          field(542, _confirm, NewPasswordText.confirmPassword(), last: true),
 
-                // حقل تأكيد كلمة المرور
-                _buildCustomTextField(
-                  controller: _confirmPasswordController,
-                  hintText: 'تأكيد كلمة المرور',
-                  obscureText: _obscureConfirmPassword,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'يرجى تأكيد كلمة المرور';
-                    }
-                    if (value != _passwordController.text) {
-                      return 'كلمتا المرور غير متطابقتين';
-                    }
-                    return null;
-                  },
-                  onToggleVisibility: () {
-                    setState(() {
-                      _obscureConfirmPassword = !_obscureConfirmPassword;
-                    });
-                  },
-                ),
-                const SizedBox(height: 32),
-
-                // زر الحفظ
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _onSavePressed,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1C382B),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.5,
-                            ),
-                          )
-                        : Text(
-                            'حفظ',
-                            style: GoogleFonts.tajawal(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 30),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCustomTextField({
-    required TextEditingController controller,
-    required String hintText,
-    required bool obscureText,
-    required VoidCallback onToggleVisibility,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      validator: validator,
-      style: GoogleFonts.tajawal(fontSize: 15, color: const Color(0xFF1E1E1E)),
-      decoration: InputDecoration(
-        hintText: hintText,
-        hintStyle: GoogleFonts.tajawal(
-          fontSize: 14,
-          color: Colors.grey.shade500,
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.2),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.2),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF1C382B), width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red, width: 1.2),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red, width: 1.5),
-        ),
-        suffixIcon: IconButton(
-          icon: Icon(
-            obscureText
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
-            color: Colors.grey.shade600,
-            size: 20,
-          ),
-          onPressed: onToggleVisibility,
-        ),
-      ),
+          authButton(c, NewPasswordText.update(), left: 16, top: 626, width: 358, loading: _loading, onTap: _update),
+        ];
+      },
     );
   }
 }

@@ -26,6 +26,12 @@
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>يستخدم لبيك موقعك لإرشادك إلى وجهتك خلال رحلتك (Labaik uses your location to guide you to your destination).</string>
+		<key>NSCameraUsageDescription</key>
+		<string>يستخدم لبيك الكاميرا لالتقاط صورة لملفك الشخصي أو لإعلان، ولمسح رمز QR للانضمام إلى دائرة عائلتك (Labaik uses the camera to take a profile or announcement photo, and to scan the QR code to join your family circle).</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>يستخدم لبيك صورك لاختيار صورة لملفك الشخصي أو لإعلان (Labaik uses your photos to pick a profile or announcement photo).</string>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>
@@ -65,6 +71,20 @@
 			<string>UIInterfaceOrientationPortraitUpsideDown</string>
 			<string>UIInterfaceOrientationLandscapeLeft</string>
 			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<!-- تسجيل الدخول بـ Google (iOS Client ID ومعكوسه) -->
+		<key>GIDClientID</key>
+		<string>917896923874-umei7rgbtp8uru0lulc3o9n30n0524ir.apps.googleusercontent.com</string>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.917896923874-umei7rgbtp8uru0lulc3o9n30n0524ir</string>
+				</array>
+			</dict>
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>

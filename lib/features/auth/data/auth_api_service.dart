@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 class AuthApiService {
@@ -90,6 +91,16 @@ class AuthApiService {
         'code': code,
         'newPassword': newPassword,
       }),
+    );
+  }
+
+  // 6.5 الدخول بـ Google: الـ ID token من google_sign_in → نفس رد /auth/login
+  static Future<http.Response> google({required String idToken}) async {
+    final url = Uri.parse('$baseUrl/google');
+    return await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'idToken': idToken}),
     );
   }
 

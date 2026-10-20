@@ -1,121 +1,50 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/utils/app_translation.dart';
-import 'signup_screen.dart';
+
+import '../../../../core/theme/figma_text.dart';
+import '../l10n/welcome_text.dart';
+import '../widgets/auth_widgets.dart';
 import 'login_screen.dart';
+import 'onboarding_screen.dart';
+import 'signup_screen.dart';
 
 // -------------------------------------------------------------
-// 4. شاشة خيارات الدخول وإنشاء الحساب (5.SignUp/Login)
+// 5.SignUp/Login — مطابقة لـ Figma (18:835)
+// مفتاح اللغة (AR/EN) — الشعار — "لَبيــك" والوصف — إنشاء حساب جديد / تسجيل الدخول
 // -------------------------------------------------------------
 class AuthWelcomeScreen extends StatelessWidget {
   const AuthWelcomeScreen({super.key});
 
+  // الرجوع: للشاشة اللي قبلها (شاشات الترحيب) — ولو فاتح التطبيق عليها مباشرة بترجع شاشات الترحيب
+  void _back(BuildContext context) {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              Image.asset(
-                'assets/images/Logo.png',
-                width: 135,
-                height: 178,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                Tr.get('labaik'),
-                textAlign: TextAlign.center,
-                style: GoogleFonts.tajawal(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1C382B),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                Tr.get('app_desc'),
-                textAlign: TextAlign.center,
-                style: GoogleFonts.tajawal(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1E1E1E),
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 32),
-              // زر إنشاء حساب
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SignupScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1C382B),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    Tr.get('create_account'),
-                    style: GoogleFonts.tajawal(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              // زر تسجيل الدخول
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(
-                      color: Color(0xFF1C382B),
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    Tr.get('login'),
-                    style: GoogleFonts.tajawal(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF1C382B),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
+    return AuthPage(
+      builder: (c) => [
+        c.rect(left: 16, top: 92, width: 75, height: 33, child: AuthLanguageToggle(s: c.s)),
+        authBack(c, context, onTap: () => _back(context)),
+        authLogo(c, left: 145, top: 104),
+        authTitle(c, WelcomeText.appName(), left: 165.33, top: 261, width: 64),
+        // SF Compact 656 16 أسود بالنص — 3 سطور زي Figma
+        c.text(
+          WelcomeText.description(),
+          left: 14,
+          top: 321,
+          width: 360,
+          height: 57,
+          align: TextAlign.center,
+          dy: 0,
+          style: authText(c, 16, FigmaWeight.sfSemibold, Colors.black),
         ),
-      ),
+        authButton(c, WelcomeText.createAccount(), left: 16, top: 391, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignupScreen()))),
+        authButton(c, WelcomeText.login(), left: 16, top: 457, outlined: true, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()))),
+      ],
     );
   }
 }

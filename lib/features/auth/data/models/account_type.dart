@@ -1,13 +1,3 @@
-// نوع الحساب الذي يختاره المستخدم بعد تأكيد التسجيل مباشرة
-enum AccountType { pilgrim, groupSupervisor }
-
-extension AccountTypeLabel on AccountType {
-  String get arabicLabel {
-    switch (this) {
-      case AccountType.pilgrim:
-        return 'معتمر / حاج';
-      case AccountType.groupSupervisor:
-        return 'مشرف المجموعة';
-    }
-  }
-}
+// نوع الحساب — بييجي من السيرفر (role) مع تسجيل الدخول، المستخدم ما بيختاره
+// superAdmin: لوحة التحكم على الويب بس — ما إله واجهة بالتطبيق
+enum AccountType { pilgrim, groupSupervisor, company, superAdmin }

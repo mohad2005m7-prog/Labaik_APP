@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/l10n/common_text.dart';
 import '../../data/models/stay_type.dart';
 import '../../data/models/trip_setup_data.dart';
+import '../controllers/auth_controller.dart';
+import '../l10n/stay_text.dart';
 import '../widgets/custom_step_progress.dart';
 import '../widgets/setup_header.dart';
-import 'home_screen.dart';
 import 'stay_place_screen.dart';
 
 // -------------------------------------------------------------
@@ -33,12 +35,8 @@ class _StayLocationScreenState extends State<StayLocationScreen> {
 
     // لو ما حدد مكان إقامته، ما في داعي لشاشة تفاصيل الإقامة
     if (_data.stayNotDecided || !hasAnyChoice) {
-      // TODO: ربط لاحقاً بالشاشة التالية عند إرسالها
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (route) => false,
-      );
+      // آخر خطوة بإعداد الرحلة → رئيسية المعتمر (والحساب بيتسجّل إنه خلّص إعداده)
+      AuthController.finishTripSetup(context);
       return;
     }
 
@@ -57,7 +55,7 @@ class _StayLocationScreenState extends State<StayLocationScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const SetupHeader(title: 'أين ستقيم؟'),
+            SetupHeader(title: StayText.title()),
             const SizedBox(
               height: 42,
               child: Padding(
@@ -72,7 +70,7 @@ class _StayLocationScreenState extends State<StayLocationScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'أخبرنا بمكان إقامتك لنساعدك في الوصول إليه والعثور على الأماكن القريبة.',
+                      StayText.description(),
                       style: GoogleFonts.tajawal(fontSize: 13, color: _green, height: 1.6),
                     ),
                     const SizedBox(height: 14),
@@ -98,7 +96,7 @@ class _StayLocationScreenState extends State<StayLocationScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         child: Text(
-                          'التالي',
+                          CommonText.next(),
                           style: GoogleFonts.tajawal(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -133,10 +131,10 @@ class _StayLocationScreenState extends State<StayLocationScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 17),
           alignment: Alignment.center,
           decoration: BoxDecoration(color: _chipFill, borderRadius: BorderRadius.circular(21)),
-          child: Text('إقامتك في $city', style: GoogleFonts.tajawal(fontSize: 12, color: _green)),
+          child: Text(StayText.inCity(city), style: GoogleFonts.tajawal(fontSize: 12, color: _green)),
         ),
         const SizedBox(height: 8),
-        Text('أين ستقيم؟', style: GoogleFonts.tajawal(fontSize: 12, color: _green)),
+        Text(StayText.title(), style: GoogleFonts.tajawal(fontSize: 12, color: _green)),
         const SizedBox(height: 17),
         _radioRow(StayType.hotel, selected, onSelect),
         const SizedBox(height: 6),
@@ -172,7 +170,7 @@ class _StayLocationScreenState extends State<StayLocationScreen> {
                   : null,
             ),
             const SizedBox(width: 6),
-            Text(value.arabicLabel, style: GoogleFonts.tajawal(fontSize: 13, color: _green)),
+            Text(value.label, style: GoogleFonts.tajawal(fontSize: 13, color: _green)),
           ],
         ),
       ),
@@ -204,7 +202,7 @@ class _StayLocationScreenState extends State<StayLocationScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Text('لم أحدد مكان إقامتي بعد', style: GoogleFonts.tajawal(fontSize: 12, color: _black)),
+        Text(StayText.notDecided(), style: GoogleFonts.tajawal(fontSize: 12, color: _black)),
       ],
     );
   }

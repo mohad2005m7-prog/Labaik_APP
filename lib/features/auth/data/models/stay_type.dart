@@ -1,3 +1,5 @@
+import '../../presentation/l10n/stay_text.dart';
+
 // نوع مكان الإقامة (فندق / مكان آخر)
 enum StayType { hotel, other }
 
@@ -10,4 +12,7 @@ extension StayTypeLabel on StayType {
         return 'مكان اخر';
     }
   }
+
+  // الاسم حسب لغة التطبيق (للعرض)
+  String get label => (this == StayType.hotel ? StayText.hotel : StayText.otherPlace)();
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/l10n/common_text.dart';
 import '../../data/models/arrival_method_enum.dart';
 import '../../data/models/trip_setup_data.dart';
+import '../l10n/arrival_method_text.dart';
 import '../widgets/custom_step_progress.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/setup_header.dart';
@@ -31,7 +33,7 @@ class _ArrivalMethodScreenState extends State<ArrivalMethodScreen> {
     final method = _data.arrivalMethod;
     if (method == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء اختيار وسيلة السفر أولاً')),
+        SnackBar(content: Text(ArrivalMethodText.chooseFirst())),
       );
       return;
     }
@@ -58,7 +60,7 @@ class _ArrivalMethodScreenState extends State<ArrivalMethodScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const SetupHeader(title: 'كيف ستصل إلى السعودية؟'),
+            SetupHeader(title: ArrivalMethodText.title()),
             const SizedBox(
               height: 42,
               child: Padding(
@@ -73,17 +75,17 @@ class _ArrivalMethodScreenState extends State<ArrivalMethodScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'اختر وسيلة السفر التي ستستخدمها للوصول إلى السعودية.',
+                      ArrivalMethodText.description(),
                       style: GoogleFonts.tajawal(fontSize: 13, color: const Color(0xFF000000)),
                     ),
                     const SizedBox(height: 18),
-                    _optionCard(ArrivalMethod.airplane, 'طائرة', Icons.flight),
+                    _optionCard(ArrivalMethod.airplane, ArrivalMethodText.airplane(), Icons.flight),
                     const SizedBox(height: 16),
-                    _optionCard(ArrivalMethod.bus, 'حافلة', Icons.directions_bus_outlined),
+                    _optionCard(ArrivalMethod.bus, ArrivalMethodText.bus(), Icons.directions_bus_outlined),
                     const SizedBox(height: 16),
-                    _optionCard(ArrivalMethod.privateCar, 'سيارة خاصة', Icons.directions_car_outlined),
+                    _optionCard(ArrivalMethod.privateCar, ArrivalMethodText.privateCar(), Icons.directions_car_outlined),
                     const SizedBox(height: 36),
-                    PrimaryButton(label: 'التالي', onPressed: _onNextPressed),
+                    PrimaryButton(label: CommonText.next(), onPressed: _onNextPressed),
                   ],
                 ),
               ),

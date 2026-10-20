@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 // -------------------------------------------------------------
@@ -31,6 +32,19 @@ class TokenStorage {
   static Future<String?> getRefreshToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_refreshTokenKey);
+  }
+
+  /// محتوى الـ accessToken (JWT claims) — رقم المستخدم، الإيميل، والدور لو السيرفر بيبعته
+  static Future<Map<String, dynamic>?> accessTokenClaims() async {
+    final token = await getAccessToken();
+    final parts = token?.split('.') ?? const [];
+    if (parts.length != 3) return null;
+    try {
+      final decoded = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<void> clearTokens() async {

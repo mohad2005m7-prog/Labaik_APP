@@ -1,8 +1,20 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// قيم --dart-define (Flutter بيبعتها لـ Gradle مشفّرة Base64) — منها مفتاح Google Maps
+val dartDefines: Map<String, String> = (project.findProperty("dart-defines") as String?)
+    ?.split(",")
+    ?.mapNotNull { encoded ->
+        val entry = String(Base64.getDecoder().decode(encoded)).split("=", limit = 2)
+        if (entry.size == 2) entry[0] to entry[1] else null
+    }
+    ?.toMap()
+    ?: emptyMap()
 
 android {
     namespace = "com.example.labaik"
@@ -27,6 +39,8 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // مفتاح Google Maps لـ AndroidManifest (نفس المفتاح اللي بيستخدمه كود Dart)
+        manifestPlaceholders["MAPS_API_KEY"] = dartDefines["MAPS_API_KEY"] ?: ""
     }
 
     buildTypes {

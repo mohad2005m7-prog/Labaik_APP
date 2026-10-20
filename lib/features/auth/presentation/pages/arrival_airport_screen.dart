@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../data/sources/saudi_airports.dart';
+import '../../../../core/l10n/common_text.dart';
 import '../../data/models/trip_setup_data.dart';
+import '../../data/sources/saudi_airports.dart';
+import '../l10n/arrival_airport_text.dart';
 import '../widgets/custom_step_progress.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/setup_dropdown.dart';
@@ -25,7 +27,7 @@ class _ArrivalAirportScreenState extends State<ArrivalAirportScreen> {
   void _onNextPressed() {
     if (_data.arrivalPlace == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء اختيار مطار الوصول أولاً')),
+        SnackBar(content: Text(ArrivalAirportText.chooseFirst())),
       );
       return;
     }
@@ -39,11 +41,11 @@ class _ArrivalAirportScreenState extends State<ArrivalAirportScreen> {
   Widget build(BuildContext context) {
     final groups = [
       SetupDropdownGroup(
-        'المطارات الدولية الرئيسية',
+        ArrivalAirportText.international(),
         SaudiAirports.international.map((a) => SetupDropdownItem(a.code, a.name)).toList(),
       ),
       SetupDropdownGroup(
-        'المطارات الإقليمية والمحلية',
+        ArrivalAirportText.regional(),
         SaudiAirports.regional.map((a) => SetupDropdownItem(a.code, a.name)).toList(),
       ),
     ];
@@ -55,7 +57,7 @@ class _ArrivalAirportScreenState extends State<ArrivalAirportScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const SetupHeader(title: 'ما مطار وصولك؟'),
+            SetupHeader(title: ArrivalAirportText.title()),
             const SizedBox(
               height: 42,
               child: Padding(
@@ -70,20 +72,20 @@ class _ArrivalAirportScreenState extends State<ArrivalAirportScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'اختر المطار الذي ستصل إليه في السعودية.',
+                      ArrivalAirportText.description(),
                       style: GoogleFonts.tajawal(fontSize: 13, color: const Color(0xFF000000)),
                     ),
                     const SizedBox(height: 18),
                     Center(
                       child: SetupDropdown(
-                        hint: 'ابحث عن مطار وصولك',
+                        hint: ArrivalAirportText.search(),
                         value: exists ? _data.arrivalPlace : null,
                         groups: groups,
                         onChanged: (v) => setState(() => _data.arrivalPlace = v),
                       ),
                     ),
                     const SizedBox(height: 31),
-                    PrimaryButton(label: 'التالي', onPressed: _onNextPressed),
+                    PrimaryButton(label: CommonText.next(), onPressed: _onNextPressed),
                   ],
                 ),
               ),

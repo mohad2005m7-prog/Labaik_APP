@@ -1,0 +1,153 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../../../core/l10n/common_text.dart';
+import '../../../../core/l10n/tx.dart';
+import '../../../../core/theme/figma_text.dart';
+import '../../../../core/utils/figma_canvas.dart';
+import '../../../terms/presentation/controllers/terms_controller.dart';
+import '../controllers/supervisor_controller.dart';
+import '../cubits/supervisor_settings_cubit.dart';
+import '../l10n/sup_settings_text.dart';
+import '../widgets/supervisor_colors.dart';
+import '../widgets/supervisor_page.dart';
+import '../widgets/supervisor_widgets.dart';
+
+// -------------------------------------------------------------
+// الإعدادات — مطابقة لـ Figma "12.Settings" (251:4783، إطار 938 فبتتمرر 86)
+// الحساب: تعديل البيانات الشخصية / تغيير كلمة المرور
+// التفضيلات: الإشعارات (مفتاح محفوظ) / لغة التطبيق (عربي - English)
+// أخرى: الشروط والأحكام (نفس شاشة المعتمر — TermsController) / مركز المساعدة ("قريباً") + تسجيل الخروج
+// -------------------------------------------------------------
+class SupervisorSettingsScreen extends StatelessWidget {
+  const SupervisorSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<SupervisorSettingsCubit>();
+    return BlocBuilder<SupervisorSettingsCubit, SupervisorSettingsState>(
+      builder: (context, state) => SupervisorPage(
+        frameHeight: 938,
+        builder: (c) => [
+          c.image('$supAssets/logo.png', left: 144, top: 112, width: 106, height: 138),
+          c.text(SupSettingsText.title(), left: 96, top: 257, width: 205, height: 29, align: TextAlign.center, style: supText(c, 24, FigmaWeight.sfBold, SupColors.green)),
+
+          _section(c, SupSettingsText.sectionAccount, top: 301, right: 375),
+          ..._row(c, const Rect.fromLTWH(17, 343, 359, 56), SupSettingsText.editPersonalData, textTop: 355.5, textRight: 333.5, icon: ('ic_set_user', const Rect.fromLTWH(342, 360, 18, 22)), arrowLeft: 30, onTap: () => SupervisorController.openEditProfile(context)),
+          ..._row(c, const Rect.fromLTWH(17, 399, 359, 56), SupSettingsText.changePassword, textTop: 412.5, textRight: 333.5, icon: ('ic_set_lock', const Rect.fromLTWH(343, 416, 19, 22)), arrowLeft: 29.5, onTap: () => SupervisorController.changePassword(context)),
+
+          _section(c, SupSettingsText.sectionPreferences, top: 470, right: 376),
+          ..._row(c, const Rect.fromLTWH(16, 512, 361, 57), SupSettingsText.notifications, textTop: 529.5, textRight: 344, icon: ('ic_set_bell', const Rect.fromLTWH(349, 528.5, 20, 23)), onTap: cubit.toggleNotifications),
+          c.rect(left: 35, top: 528.5, width: 48, height: 24, child: _Switch(scale: c, on: state.notifications)),
+          ..._row(c, const Rect.fromLTWH(16, 569, 361, 57), SupSettingsText.appLanguage, textTop: 587.5, textRight: 341, icon: ('ic_set_globe', const Rect.fromLTWH(346, 585.5, 24, 24)), onTap: () => _pickLanguage(context, cubit)),
+          // "العربية ‹" — #6E6B6B (السهم '›' بينعكس '‹' بالعربي)
+          c.text('${(state.language == 'ar' ? CommonText.arabic : CommonText.english)()} ›', left: 30, top: 589, width: 42, height: 16, style: supText(c, 13, FigmaWeight.poppinsRegular, SupColors.languageValue)),
+
+          _section(c, SupSettingsText.sectionOther, top: 641, right: 376),
+          ..._row(c, const Rect.fromLTWH(16, 683, 361, 58), SupSettingsText.terms, textTop: 701.5, textRight: 341, icon: ('ic_set_clipboard', const Rect.fromLTWH(348.5, 701.5, 21, 21)), arrowLeft: 31, onTap: () => TermsController.open(context)),
+          ..._row(c, const Rect.fromLTWH(16, 741, 361, 56), SupSettingsText.helpCenter, textTop: 758, textRight: 340, icon: ('ic_set_help', const Rect.fromLTWH(347, 758, 22, 22)), arrowLeft: 32, onTap: () => SupervisorController.comingSoon(context)),
+
+          // تسجيل الخروج: #FEECEB — حد #F44336 — radius 14 — نص أحمر بالنص
+          c.box(left: 19, top: 821, width: 358, height: 50, color: SupColors.redFill, radius: 14, borderColor: SupColors.red),
+          c.text(SupSettingsText.logout(), left: 19, top: 835.5, width: 358, height: 20, align: TextAlign.center, style: supText(c, 16.75, FigmaWeight.sfRegular, SupColors.red)),
+          c.tapArea(left: 19, top: 821, width: 358, height: 50, onTap: () => SupervisorController.logout(context)),
+
+          ...supBackArrow(c, context, left: 358, top: 64, trailing: true, color: Colors.black),
+        ],
+      ),
+    );
+  }
+
+  // عنوان القسم — SF Compact Bold 16 — طرفه [right]
+  Widget _section(FigmaCanvas c, Tx title, {required double top, required double right}) {
+    return c.text(title(), left: 200, top: top, width: right - 200, height: 19, style: supText(c, 16, FigmaWeight.sfBold, SupColors.green));
+  }
+
+  // صف: حد #1F3B2E — radius 14 — النص SF Compact Bold 16 رمادي — الأيقونة يمين والمثلث الصغير يسار
+  List<Widget> _row(FigmaCanvas c, Rect r, Tx label, {required double textTop, required double textRight, required (String, Rect) icon, double? arrowLeft, required VoidCallback onTap}) {
+    final (asset, iconRect) = icon;
+    return [
+      c.box(left: r.left, top: r.top, width: r.width, height: r.height, radius: 14, borderColor: SupColors.green),
+      c.image('$supAssets/$asset.png', left: iconRect.left, top: iconRect.top, width: iconRect.width, height: iconRect.height),
+      c.text(label(), left: 100, top: textTop, width: textRight - 100, height: 19, style: supText(c, 16, FigmaWeight.sfBold, SupColors.grey)),
+      if (arrowLeft != null) c.rect(left: arrowLeft, top: r.top + r.height / 2 - 4, width: 4, height: 8, child: const _Triangle()),
+      c.tapArea(left: r.left, top: r.top, width: r.width, height: r.height, onTap: onTap),
+    ];
+  }
+
+  Future<void> _pickLanguage(BuildContext context, SupervisorSettingsCubit cubit) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // كل لغة باسمها هي (العربية / English)
+            for (final (code, name) in [('ar', CommonText.arabic.ar), ('en', CommonText.english.en)])
+              ListTile(
+                title: Text(name, style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 16, color: SupColors.green)),
+                trailing: code == cubit.state.language ? const Icon(Icons.check, color: SupColors.green) : null,
+                onTap: () => Navigator.pop(context, code),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) await cubit.setLanguage(picked);
+  }
+}
+
+class _Triangle extends StatelessWidget {
+  const _Triangle();
+
+  @override
+  Widget build(BuildContext context) {
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return CustomPaint(painter: _TrianglePainter(pointLeft: rtl));
+  }
+}
+
+class _TrianglePainter extends CustomPainter {
+  final bool pointLeft;
+
+  const _TrianglePainter({required this.pointLeft});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = pointLeft
+        ? (Path()..moveTo(size.width, 0)..lineTo(0, size.height / 2)..lineTo(size.width, size.height)..close())
+        : (Path()..moveTo(0, 0)..lineTo(size.width, size.height / 2)..lineTo(0, size.height)..close());
+    canvas.drawPath(path, Paint()..color = SupColors.green..isAntiAlias = true);
+  }
+
+  @override
+  bool shouldRepaint(_TrianglePainter old) => old.pointLeft != pointLeft;
+}
+
+/// مفتاح الإشعارات 48×24 — مفعّل: أخضر والدائرة البيضا (20) لجهة النهاية (يسار بالعربي)
+class _Switch extends StatelessWidget {
+  final FigmaCanvas scale;
+  final bool on;
+
+  const _Switch({required this.scale, required this.on});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale.s;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      decoration: BoxDecoration(color: on ? const Color(0xFF1E382C) : SupColors.avatarPlaceholder, borderRadius: BorderRadius.circular(s.x(12))),
+      child: AnimatedAlign(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        alignment: on ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: s.x(4)),
+          child: Container(width: s.x(20), height: s.x(20), decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+        ),
+      ),
+    );
+  }
+}

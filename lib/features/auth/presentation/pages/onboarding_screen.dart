@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/utils/app_translation.dart';
-import 'language_screen.dart';
+
+import '../../../../core/l10n/common_text.dart';
+import '../../../../core/utils/app_preferences.dart';
+import '../l10n/onboarding_text.dart';
+import 'auth_welcome_screen.dart';
 
 // -------------------------------------------------------------
 // 2. شاشات الترحيب (Onboarding Screen)
@@ -17,23 +20,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
 
+  // آخر صفحة: بنحفظ إنه شاف شاشات الترحيب (ما بتظهر مرة ثانية) ثم 5.SignUp/Login (فيها مفتاح اللغة)
+  Future<void> _onNextPressed(int pagesCount) async {
+    if (_currentIndex == pagesCount - 1) {
+      await AppPreferences.setOnboardingSeen();
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AuthWelcomeScreen()),
+      );
+    } else {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<Map<String, String>> pages = [
       {
         'image': 'assets/images/2.Onboarding.png',
-        'title': Tr.get('onboarding_1_title'),
-        'desc': Tr.get('onboarding_1_desc'),
+        'title': OnboardingText.title1(),
+        'desc': OnboardingText.description1(),
       },
       {
         'image': 'assets/images/3.Onboarding.png',
-        'title': Tr.get('onboarding_2_title'),
-        'desc': Tr.get('onboarding_2_desc'),
+        'title': OnboardingText.title2(),
+        'desc': OnboardingText.description2(),
       },
       {
         'image': 'assets/images/4.Onboarding.png',
-        'title': Tr.get('onboarding_3_title'),
-        'desc': Tr.get('onboarding_3_desc'),
+        'title': OnboardingText.title3(),
+        'desc': OnboardingText.description3(),
       },
     ];
 
@@ -130,21 +156,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: () {
-                    if (_currentIndex == pages.length - 1) {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LanguageScreen(),
-                        ),
-                      );
-                    } else {
-                      _pageController.nextPage(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    }
-                  },
+                  onPressed: () => _onNextPressed(pages.length),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1C382B),
                     elevation: 0,
@@ -154,8 +166,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   child: Text(
                     _currentIndex == pages.length - 1
-                        ? Tr.get('start_journey')
-                        : Tr.get('next'),
+                        ? OnboardingText.startJourney()
+                        : CommonText.next(),
                     style: GoogleFonts.tajawal(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
