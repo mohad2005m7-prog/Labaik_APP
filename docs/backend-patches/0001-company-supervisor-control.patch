@@ -1,0 +1,2496 @@
+From b0a0b7321e8975101fe73fcaec920839877a30c2 Mon Sep 17 00:00:00 2001
+From: Mohammad <mohad2005m7@gmail.com>
+Date: Tue, 20 Oct 2026 19:10:39 +0000
+Subject: [PATCH] feat(company): let a company control its supervisors
+
+- DELETE /company/supervisors/{userId}: take a supervisor off the roster (204).
+  409 Company.SupervisorLeadsGroups while they still lead one of the company's
+  groups; the Supervisor role is removed when no roster has them any more.
+- POST /company/supervisors/{userId}/disable | enable (204): CompanySupervisor
+  gains IsSuspended (roster rows expose isSuspended, additive). A supervisor
+  suspended on every roster gets 403 Supervisor.Suspended on login, verify,
+  Google and refresh (checked in BuildAuthUserAsync); suspending revokes the
+  supervisor's refresh tokens.
+- POST /company/supervisors/{userId}/temp-password (200 { temporaryPassword }):
+  replaces the password with a new temporary one, emails it, revokes sessions.
+- Not on my roster -> 404 Company.SupervisorNotOnRoster.
+- Migration AddSupervisorSuspension (IsSuspended bool, default false).
+- Tests: domain (suspend/reactivate/remove rules) + integration (temp password
+  replaces the old one, suspended supervisor blocked until reactivated, remove
+  only after reassigning groups, role dropped). OpenAPI snapshot refreshed.
+
+Non-breaking for Flutter: new endpoints and one additive field.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jr2Qm8EMVF7cfvmCiiJ7dx
+---
+ CLAUDE.md                                     |    1 +
+ docs/openapi/v1.json                          |  301 +++-
+ src/Labaik.Api/Endpoints/CompanyEndpoints.cs  |   44 +
+ .../Common/Interfaces/IIdentityService.cs     |    2 +
+ .../Common/Provisioning/AccountEmails.cs      |   15 +
+ ...IssueSupervisorTemporaryPasswordCommand.cs |   52 +
+ .../RemoveCompanySupervisorCommand.cs         |   48 +
+ .../SetCompanySupervisorSuspendedCommand.cs   |   45 +
+ .../Features/Companies/Dtos/CompanyDtos.cs    |    4 +-
+ .../GetCompanySupervisorsQuery.cs             |    4 +-
+ src/Labaik.Domain/Companies/Company.cs        |   35 +
+ src/Labaik.Domain/Companies/CompanyErrors.cs  |    6 +
+ .../Companies/CompanySupervisor.cs            |    6 +
+ .../Identity/IdentityService.cs               |   45 +-
+ ...190621_AddSupervisorSuspension.Designer.cs | 1429 +++++++++++++++++
+ .../20261020190621_AddSupervisorSuspension.cs |   29 +
+ .../Migrations/AppDbContextModelSnapshot.cs   |    3 +
+ .../SupervisorRosterTests.cs                  |   76 +
+ tests/Labaik.Domain.Tests/CompanyTests.cs     |   22 +
+ 19 files changed, 2159 insertions(+), 8 deletions(-)
+ create mode 100644 src/Labaik.Application/Features/Companies/Commands/IssueSupervisorTemporaryPassword/IssueSupervisorTemporaryPasswordCommand.cs
+ create mode 100644 src/Labaik.Application/Features/Companies/Commands/RemoveCompanySupervisor/RemoveCompanySupervisorCommand.cs
+ create mode 100644 src/Labaik.Application/Features/Companies/Commands/SetCompanySupervisorSuspended/SetCompanySupervisorSuspendedCommand.cs
+ create mode 100644 src/Labaik.Infrastructure/Persistence/Migrations/20261020190621_AddSupervisorSuspension.Designer.cs
+ create mode 100644 src/Labaik.Infrastructure/Persistence/Migrations/20261020190621_AddSupervisorSuspension.cs
+
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 57f783b..4048716 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -309,6 +309,7 @@ in T13 is the core of it. Build the rest of F after A if time is tight.
+ - `PUT /company/groups/{groupId}/supervisor` (grants `Supervisor` role).
+ - _Done:_ `Group` gains nullable `CompanyId`/`TripId` (FKs) and `LeaderId` is now **nullable** (company groups start with no supervisor); `Group.CreateForTrip`, `AssignSupervisor` (replaces + removes the previous supervisor, promotes an existing member, idempotent, `SupervisorAssigned` event), `AddMember`, `RemoveMember` (supervisor can't be removed -> 409); members/supervisor are added **by email of an existing account**; extra `GET /company/trips/{tripId}/groups` (company needs to list group ids); `POST /groups` and `POST /groups/{code}/join` are now **Admin-only** (locked decision 2); `GenerateUniqueJoinCodeAsync` shared; migration `AddCompanyManagedGroups`.
+ - _Updated (18 Oct 2026):_ supervisors come from a **company roster** (`Company.Supervisors`, `POST/GET /company/supervisors`, provisioned with a temporary password); `PUT .../supervisor` accepts **roster supervisors only** (404 otherwise). `POST .../members` with an unknown email **creates a pilgrim account** (optional `fullName`, `phoneNumber`). Migration `AddCompanySupervisorRoster` (backfills current group supervisors).
++- _Updated (20 Oct 2026, company controls its supervisors):_ `DELETE /company/supervisors/{userId}` (204; 409 `Company.SupervisorLeadsGroups` while they lead one of its groups; the Supervisor role is removed when no roster has them), `POST /company/supervisors/{userId}/disable|enable` (204; `CompanySupervisor.IsSuspended`, shown as `isSuspended` on the roster; a supervisor suspended on **every** roster gets 403 `Supervisor.Suspended` on login/verify/google/refresh via `BuildAuthUserAsync`; suspension revokes refresh tokens), `POST /company/supervisors/{userId}/temp-password` (200 `{ temporaryPassword }`, also emailed; old password and sessions stop working). Not on my roster -> 404 `Company.SupervisorNotOnRoster`. Migration `AddSupervisorSuspension`.
+ 
+ **T16 — Company dashboard numbers**
+ - `GET /company/home` -> `{ activeTrips, pilgrimsCount, supervisorsCount, groupsCount }`.
+diff --git a/docs/openapi/v1.json b/docs/openapi/v1.json
+index efeaa00..188a39d 100644
+--- a/docs/openapi/v1.json
++++ b/docs/openapi/v1.json
+@@ -4568,7 +4568,8 @@
+                   "email": "omar@alnoor.example",
+                   "phoneNumber": "\u002B966551112233",
+                   "addedAtUtc": "2026-10-18T10:00:00\u002B00:00",
+-                  "groupsCount": 0
++                  "groupsCount": 0,
++                  "isSuspended": false
+                 }
+               }
+             }
+@@ -4649,7 +4650,8 @@
+                     "email": "omar@alnoor.example",
+                     "phoneNumber": "\u002B966551112233",
+                     "addedAtUtc": "2026-10-18T10:00:00\u002B00:00",
+-                    "groupsCount": 1
++                    "groupsCount": 1,
++                    "isSuspended": false
+                   },
+                   {
+                     "userId": "4c5d6e7f-8091-4a2b-8c3d-4e5f6a7b8c9d",
+@@ -4657,7 +4659,8 @@
+                     "email": "yusuf@alnoor.example",
+                     "phoneNumber": null,
+                     "addedAtUtc": "2026-10-18T10:05:00\u002B00:00",
+-                    "groupsCount": 0
++                    "groupsCount": 0,
++                    "isSuspended": false
+                   }
+                 ]
+               }
+@@ -4676,6 +4679,283 @@
+         }
+       }
+     },
++    "/api/v1/company/supervisors/{userId}": {
++      "delete": {
++        "tags": [
++          "Company"
++        ],
++        "summary": "Take a supervisor off my roster (409 while they still lead one of my groups)",
++        "operationId": "RemoveCompanySupervisor",
++        "parameters": [
++          {
++            "name": "userId",
++            "in": "path",
++            "required": true,
++            "schema": {
++              "type": "string",
++              "format": "uuid"
++            }
++          }
++        ],
++        "responses": {
++          "401": {
++            "description": "Unauthorized",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "403": {
++            "description": "Forbidden",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "204": {
++            "description": "No Content"
++          },
++          "404": {
++            "description": "Not Found",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "409": {
++            "description": "Conflict",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "default": {
++            "description": "Error: RFC 9457 ProblemDetails with \u0022code\u0022 (see components.schemas.ProblemDetails).",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          }
++        }
++      }
++    },
++    "/api/v1/company/supervisors/{userId}/disable": {
++      "post": {
++        "tags": [
++          "Company"
++        ],
++        "summary": "Suspend a supervisor on my roster (suspended everywhere: sign-in and refresh get 403 Supervisor.Suspended)",
++        "operationId": "SuspendCompanySupervisor",
++        "parameters": [
++          {
++            "name": "userId",
++            "in": "path",
++            "required": true,
++            "schema": {
++              "type": "string",
++              "format": "uuid"
++            }
++          }
++        ],
++        "responses": {
++          "401": {
++            "description": "Unauthorized",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "403": {
++            "description": "Forbidden",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "204": {
++            "description": "No Content"
++          },
++          "404": {
++            "description": "Not Found",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "default": {
++            "description": "Error: RFC 9457 ProblemDetails with \u0022code\u0022 (see components.schemas.ProblemDetails).",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          }
++        }
++      }
++    },
++    "/api/v1/company/supervisors/{userId}/enable": {
++      "post": {
++        "tags": [
++          "Company"
++        ],
++        "summary": "Reactivate a suspended supervisor on my roster",
++        "operationId": "ReactivateCompanySupervisor",
++        "parameters": [
++          {
++            "name": "userId",
++            "in": "path",
++            "required": true,
++            "schema": {
++              "type": "string",
++              "format": "uuid"
++            }
++          }
++        ],
++        "responses": {
++          "401": {
++            "description": "Unauthorized",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "403": {
++            "description": "Forbidden",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "204": {
++            "description": "No Content"
++          },
++          "404": {
++            "description": "Not Found",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "default": {
++            "description": "Error: RFC 9457 ProblemDetails with \u0022code\u0022 (see components.schemas.ProblemDetails).",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          }
++        }
++      }
++    },
++    "/api/v1/company/supervisors/{userId}/temp-password": {
++      "post": {
++        "tags": [
++          "Company"
++        ],
++        "summary": "New temporary password for a supervisor on my roster (emailed, returned once; old password and sessions stop working)",
++        "operationId": "IssueSupervisorTemporaryPassword",
++        "parameters": [
++          {
++            "name": "userId",
++            "in": "path",
++            "required": true,
++            "schema": {
++              "type": "string",
++              "format": "uuid"
++            }
++          }
++        ],
++        "responses": {
++          "401": {
++            "description": "Unauthorized",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "403": {
++            "description": "Forbidden",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "200": {
++            "description": "OK",
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/TemporaryPasswordDto"
++                }
++              }
++            }
++          },
++          "404": {
++            "description": "Not Found",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          },
++          "default": {
++            "description": "Error: RFC 9457 ProblemDetails with \u0022code\u0022 (see components.schemas.ProblemDetails).",
++            "content": {
++              "application/problem\u002Bjson": {
++                "schema": {
++                  "$ref": "#/components/schemas/ProblemDetails"
++                }
++              }
++            }
++          }
++        }
++      }
++    },
+     "/api/v1/company/announcements": {
+       "post": {
+         "tags": [
+@@ -8246,6 +8526,10 @@
+           "groupsCount": {
+             "type": "integer",
+             "format": "int32"
++          },
++          "isSuspended": {
++            "type": "boolean",
++            "default": false
+           }
+         }
+       },
+@@ -10627,6 +10911,17 @@
+           }
+         }
+       },
++      "TemporaryPasswordDto": {
++        "required": [
++          "temporaryPassword"
++        ],
++        "type": "object",
++        "properties": {
++          "temporaryPassword": {
++            "type": "string"
++          }
++        }
++      },
+       "TransportMode": {
+         "enum": [
+           1,
+diff --git a/src/Labaik.Api/Endpoints/CompanyEndpoints.cs b/src/Labaik.Api/Endpoints/CompanyEndpoints.cs
+index 92abe38..c67dcf5 100644
+--- a/src/Labaik.Api/Endpoints/CompanyEndpoints.cs
++++ b/src/Labaik.Api/Endpoints/CompanyEndpoints.cs
+@@ -4,6 +4,9 @@ using Labaik.Api.Extensions;
+ using Labaik.Api.OpenApi;
+ using Labaik.Application.Features.Announcements.Commands.PostCompanyAnnouncement;
+ using Labaik.Application.Features.Companies.Commands.AddCompanySupervisor;
++using Labaik.Application.Features.Companies.Commands.IssueSupervisorTemporaryPassword;
++using Labaik.Application.Features.Companies.Commands.RemoveCompanySupervisor;
++using Labaik.Application.Features.Companies.Commands.SetCompanySupervisorSuspended;
+ using Labaik.Application.Features.Companies.Commands.UpdateMyCompany;
+ using Labaik.Application.Features.Companies.Queries.GetCompanyHome;
+ using Labaik.Application.Features.Companies.Queries.GetCompanySupervisors;
+@@ -91,6 +94,47 @@ public static class CompanyEndpoints
+         .WithSummary("My supervisor roster, by name, with how many of my groups each supervises")
+         .WithResponseExample(StatusCodes.Status200OK, CompanyExamples.Supervisors);
+ 
++        group.MapDelete("/supervisors/{userId:guid}", async (Guid userId, ISender sender, CancellationToken ct) =>
++        {
++            var result = await sender.Send(new RemoveCompanySupervisorCommand(userId), ct);
++            return result.IsSuccess ? Results.NoContent() : result.Error!.ToProblem();
++        })
++        .WithName("RemoveCompanySupervisor")
++        .WithSummary("Take a supervisor off my roster (409 while they still lead one of my groups)")
++        .Produces(StatusCodes.Status204NoContent)
++        .ProducesProblem(StatusCodes.Status404NotFound)
++        .ProducesProblem(StatusCodes.Status409Conflict);
++
++        group.MapPost("/supervisors/{userId:guid}/disable", async (Guid userId, ISender sender, CancellationToken ct) =>
++        {
++            var result = await sender.Send(new SetCompanySupervisorSuspendedCommand(userId, Suspended: true), ct);
++            return result.IsSuccess ? Results.NoContent() : result.Error!.ToProblem();
++        })
++        .WithName("SuspendCompanySupervisor")
++        .WithSummary("Suspend a supervisor on my roster (suspended everywhere: sign-in and refresh get 403 Supervisor.Suspended)")
++        .Produces(StatusCodes.Status204NoContent)
++        .ProducesProblem(StatusCodes.Status404NotFound);
++
++        group.MapPost("/supervisors/{userId:guid}/enable", async (Guid userId, ISender sender, CancellationToken ct) =>
++        {
++            var result = await sender.Send(new SetCompanySupervisorSuspendedCommand(userId, Suspended: false), ct);
++            return result.IsSuccess ? Results.NoContent() : result.Error!.ToProblem();
++        })
++        .WithName("ReactivateCompanySupervisor")
++        .WithSummary("Reactivate a suspended supervisor on my roster")
++        .Produces(StatusCodes.Status204NoContent)
++        .ProducesProblem(StatusCodes.Status404NotFound);
++
++        group.MapPost("/supervisors/{userId:guid}/temp-password", async (Guid userId, ISender sender, CancellationToken ct) =>
++        {
++            var result = await sender.Send(new IssueSupervisorTemporaryPasswordCommand(userId), ct);
++            return result.IsSuccess ? Results.Ok(result.Value) : result.Error!.ToProblem();
++        })
++        .WithName("IssueSupervisorTemporaryPassword")
++        .WithSummary("New temporary password for a supervisor on my roster (emailed, returned once; old password and sessions stop working)")
++        .Produces<TemporaryPasswordDto>()
++        .ProducesProblem(StatusCodes.Status404NotFound);
++
+         group.MapPost("/announcements", async (PostCompanyAnnouncementCommand command, ISender sender, CancellationToken ct) =>
+         {
+             var result = await sender.Send(command, ct);
+diff --git a/src/Labaik.Application/Common/Interfaces/IIdentityService.cs b/src/Labaik.Application/Common/Interfaces/IIdentityService.cs
+index 0546f40..d469714 100644
+--- a/src/Labaik.Application/Common/Interfaces/IIdentityService.cs
++++ b/src/Labaik.Application/Common/Interfaces/IIdentityService.cs
+@@ -22,5 +22,7 @@ public interface IIdentityService
+         string fullName, string email, string? phoneNumber, string? role, CancellationToken cancellationToken = default);
+     Task<Result<UserAccountDto>> AddToRoleAsync(Guid userId, string role, CancellationToken cancellationToken = default);
+     Task<Result<UserAccountDto>> RemoveFromRoleAsync(Guid userId, string role, CancellationToken cancellationToken = default);
++    // Replaces the password with a new temporary one and revokes the account's sessions.
++    Task<Result<ProvisionedAccount>> IssueTemporaryPasswordAsync(Guid userId, CancellationToken cancellationToken = default);
+     Task<Result> ResetPasswordAsync(string email, string code, string newPassword, CancellationToken cancellationToken = default);
+ }
+\ No newline at end of file
+diff --git a/src/Labaik.Application/Common/Provisioning/AccountEmails.cs b/src/Labaik.Application/Common/Provisioning/AccountEmails.cs
+index 83a1839..1c83ed7 100644
+--- a/src/Labaik.Application/Common/Provisioning/AccountEmails.cs
++++ b/src/Labaik.Application/Common/Provisioning/AccountEmails.cs
+@@ -39,6 +39,21 @@ public static class AccountEmails
+             """);
+     }
+ 
++    // A new temporary password issued by the company (the previous one no longer works).
++    public static (string Subject, string Body) TemporaryPassword(ProvisionedAccount account, string companyName) =>
++        ("Your new Labaik temporary password",
++            $"""
++            Hello {account.FullName},
++
++            {companyName} issued a new temporary password for your Labaik account.
++
++            Sign in with:
++              Email: {account.Email}
++              Temporary password: {account.TemporaryPassword}
++
++            Your previous password no longer works. Please change this one after signing in.
++            """);
++
+     // Email delivery must not undo a committed provisioning: failures are logged, not thrown.
+     public static async Task<bool> TrySendAsync(
+         this IEmailSender emailSender,
+diff --git a/src/Labaik.Application/Features/Companies/Commands/IssueSupervisorTemporaryPassword/IssueSupervisorTemporaryPasswordCommand.cs b/src/Labaik.Application/Features/Companies/Commands/IssueSupervisorTemporaryPassword/IssueSupervisorTemporaryPasswordCommand.cs
+new file mode 100644
+index 0000000..5d541d0
+--- /dev/null
++++ b/src/Labaik.Application/Features/Companies/Commands/IssueSupervisorTemporaryPassword/IssueSupervisorTemporaryPasswordCommand.cs
+@@ -0,0 +1,52 @@
++using Labaik.Application.Common.Interfaces;
++using Labaik.Application.Common.Provisioning;
++using Labaik.Application.Features.Companies.Common;
++using Labaik.Domain.Common.Results;
++using Labaik.Domain.Companies;
++using MediatR;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.Extensions.Logging;
++
++namespace Labaik.Application.Features.Companies.Commands.IssueSupervisorTemporaryPassword;
++
++// A company issues a new temporary password for one of its supervisors (e.g. they forgot it).
++// The old password and sessions stop working; the new one is emailed and returned once so the
++// company can also hand it over directly.
++public sealed record IssueSupervisorTemporaryPasswordCommand(Guid UserId) : IRequest<Result<TemporaryPasswordDto>>;
++
++public sealed record TemporaryPasswordDto(string TemporaryPassword);
++
++public sealed class IssueSupervisorTemporaryPasswordCommandHandler(
++    IAppDbContext context,
++    ICurrentUser currentUser,
++    IIdentityService identityService,
++    IEmailSender emailSender,
++    ILogger<IssueSupervisorTemporaryPasswordCommandHandler> logger)
++    : IRequestHandler<IssueSupervisorTemporaryPasswordCommand, Result<TemporaryPasswordDto>>
++{
++    public async Task<Result<TemporaryPasswordDto>> Handle(IssueSupervisorTemporaryPasswordCommand request, CancellationToken cancellationToken)
++    {
++        var companyId = await context.GetMyCompanyIdAsync(currentUser, cancellationToken);
++        if (companyId.IsFailure)
++        {
++            return companyId.Error!;
++        }
++
++        var company = await context.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId.Value, cancellationToken);
++        if (!company.HasSupervisor(request.UserId))
++        {
++            return CompanyErrors.SupervisorNotOnRoster;
++        }
++
++        var account = await identityService.IssueTemporaryPasswordAsync(request.UserId, cancellationToken);
++        if (account.IsFailure)
++        {
++            return account.Error!;
++        }
++
++        await emailSender.TrySendAsync(account.Value.Email,
++            AccountEmails.TemporaryPassword(account.Value, company.Name), logger, cancellationToken);
++
++        return new TemporaryPasswordDto(account.Value.TemporaryPassword!);
++    }
++}
+diff --git a/src/Labaik.Application/Features/Companies/Commands/RemoveCompanySupervisor/RemoveCompanySupervisorCommand.cs b/src/Labaik.Application/Features/Companies/Commands/RemoveCompanySupervisor/RemoveCompanySupervisorCommand.cs
+new file mode 100644
+index 0000000..560ec65
+--- /dev/null
++++ b/src/Labaik.Application/Features/Companies/Commands/RemoveCompanySupervisor/RemoveCompanySupervisorCommand.cs
+@@ -0,0 +1,48 @@
++using Labaik.Application.Common.Authorization;
++using Labaik.Application.Common.Interfaces;
++using Labaik.Application.Features.Companies.Common;
++using Labaik.Domain.Common.Results;
++using MediatR;
++using Microsoft.EntityFrameworkCore;
++
++namespace Labaik.Application.Features.Companies.Commands.RemoveCompanySupervisor;
++
++// A company takes a supervisor off its roster. Refused (409) while they still lead one of its groups.
++// The account stays; it loses the Supervisor role only when no other company has it on its roster.
++public sealed record RemoveCompanySupervisorCommand(Guid UserId) : IRequest<Result>;
++
++public sealed class RemoveCompanySupervisorCommandHandler(
++    IAppDbContext context,
++    ICurrentUser currentUser,
++    IIdentityService identityService) : IRequestHandler<RemoveCompanySupervisorCommand, Result>
++{
++    public async Task<Result> Handle(RemoveCompanySupervisorCommand request, CancellationToken cancellationToken)
++    {
++        var companyId = await context.GetMyCompanyIdAsync(currentUser, cancellationToken);
++        if (companyId.IsFailure)
++        {
++            return Result.Failure(companyId.Error!);
++        }
++
++        var company = await context.Companies.FirstAsync(c => c.Id == companyId.Value, cancellationToken);
++        var leadsGroups = await context.Groups
++            .AnyAsync(g => g.CompanyId == company.Id && g.LeaderId == request.UserId, cancellationToken);
++
++        var remove = company.RemoveSupervisor(request.UserId, leadsGroups);
++        if (remove.IsFailure)
++        {
++            return remove;
++        }
++
++        await context.SaveChangesAsync(cancellationToken);
++
++        var onOtherRoster = await context.Companies
++            .AnyAsync(c => c.Id != company.Id && c.Supervisors.Any(s => s.UserId == request.UserId), cancellationToken);
++        if (!onOtherRoster)
++        {
++            await identityService.RemoveFromRoleAsync(request.UserId, Roles.Supervisor, cancellationToken);
++        }
++
++        return Result.Success();
++    }
++}
+diff --git a/src/Labaik.Application/Features/Companies/Commands/SetCompanySupervisorSuspended/SetCompanySupervisorSuspendedCommand.cs b/src/Labaik.Application/Features/Companies/Commands/SetCompanySupervisorSuspended/SetCompanySupervisorSuspendedCommand.cs
+new file mode 100644
+index 0000000..eac3274
+--- /dev/null
++++ b/src/Labaik.Application/Features/Companies/Commands/SetCompanySupervisorSuspended/SetCompanySupervisorSuspendedCommand.cs
+@@ -0,0 +1,45 @@
++using Labaik.Application.Common.Interfaces;
++using Labaik.Application.Features.Companies.Common;
++using Labaik.Domain.Common.Results;
++using MediatR;
++using Microsoft.EntityFrameworkCore;
++
++namespace Labaik.Application.Features.Companies.Commands.SetCompanySupervisorSuspended;
++
++// A company suspends (or reactivates) a supervisor on its roster. A supervisor suspended by every
++// company they are on cannot sign in or refresh (403 Supervisor.Suspended); suspending also revokes
++// their refresh tokens so the current session ends when the access token expires.
++public sealed record SetCompanySupervisorSuspendedCommand(Guid UserId, bool Suspended) : IRequest<Result>;
++
++public sealed class SetCompanySupervisorSuspendedCommandHandler(
++    IAppDbContext context,
++    ICurrentUser currentUser,
++    IRefreshTokenService refreshTokenService) : IRequestHandler<SetCompanySupervisorSuspendedCommand, Result>
++{
++    public async Task<Result> Handle(SetCompanySupervisorSuspendedCommand request, CancellationToken cancellationToken)
++    {
++        var companyId = await context.GetMyCompanyIdAsync(currentUser, cancellationToken);
++        if (companyId.IsFailure)
++        {
++            return Result.Failure(companyId.Error!);
++        }
++
++        var company = await context.Companies.FirstAsync(c => c.Id == companyId.Value, cancellationToken);
++        var change = request.Suspended
++            ? company.SuspendSupervisor(request.UserId)
++            : company.ReactivateSupervisor(request.UserId);
++        if (change.IsFailure)
++        {
++            return change;
++        }
++
++        await context.SaveChangesAsync(cancellationToken);
++
++        if (request.Suspended)
++        {
++            await refreshTokenService.RevokeAllForUserAsync(request.UserId, cancellationToken);
++        }
++
++        return Result.Success();
++    }
++}
+diff --git a/src/Labaik.Application/Features/Companies/Dtos/CompanyDtos.cs b/src/Labaik.Application/Features/Companies/Dtos/CompanyDtos.cs
+index 175ce63..7aaa88a 100644
+--- a/src/Labaik.Application/Features/Companies/Dtos/CompanyDtos.cs
++++ b/src/Labaik.Application/Features/Companies/Dtos/CompanyDtos.cs
+@@ -16,13 +16,15 @@ public sealed record CompanyDto(
+     string ContactFullName);
+ 
+ // A supervisor on the company's roster. GroupsCount = the company's groups they currently supervise.
++// IsSuspended = the company suspended them (they cannot sign in if every company they are on did).
+ public sealed record CompanySupervisorDto(
+     Guid UserId,
+     string FullName,
+     string Email,
+     string? PhoneNumber,
+     DateTimeOffset AddedAtUtc,
+-    int GroupsCount);
++    int GroupsCount,
++    bool IsSuspended = false);
+ 
+ public sealed record CompanyServicesDto(
+     bool GpsTracking,
+diff --git a/src/Labaik.Application/Features/Companies/Queries/GetCompanySupervisors/GetCompanySupervisorsQuery.cs b/src/Labaik.Application/Features/Companies/Queries/GetCompanySupervisors/GetCompanySupervisorsQuery.cs
+index 6d72515..8b7312d 100644
+--- a/src/Labaik.Application/Features/Companies/Queries/GetCompanySupervisors/GetCompanySupervisorsQuery.cs
++++ b/src/Labaik.Application/Features/Companies/Queries/GetCompanySupervisors/GetCompanySupervisorsQuery.cs
+@@ -29,7 +29,7 @@ public sealed class GetCompanySupervisorsQueryHandler(
+             .AsNoTracking()
+             .Where(c => c.Id == id)
+             .SelectMany(c => c.Supervisors)
+-            .Select(s => new { s.UserId, s.AddedAtUtc })
++            .Select(s => new { s.UserId, s.AddedAtUtc, s.IsSuspended })
+             .ToListAsync(cancellationToken);
+ 
+         var groupsBySupervisor = await context.Groups
+@@ -43,7 +43,7 @@ public sealed class GetCompanySupervisorsQueryHandler(
+         return roster
+             .Select(s => contacts.TryGetValue(s.UserId, out var c)
+                 ? new CompanySupervisorDto(s.UserId, c.FullName, c.Email ?? string.Empty, c.PhoneNumber,
+-                    s.AddedAtUtc, groupsBySupervisor.GetValueOrDefault(s.UserId))
++                    s.AddedAtUtc, groupsBySupervisor.GetValueOrDefault(s.UserId), s.IsSuspended)
+                 : null)
+             .OfType<CompanySupervisorDto>()
+             .OrderBy(s => s.FullName, StringComparer.OrdinalIgnoreCase)
+diff --git a/src/Labaik.Domain/Companies/Company.cs b/src/Labaik.Domain/Companies/Company.cs
+index 0521740..4949e11 100644
+--- a/src/Labaik.Domain/Companies/Company.cs
++++ b/src/Labaik.Domain/Companies/Company.cs
+@@ -190,6 +190,41 @@ public sealed class Company : AggregateRoot
+ 
+     public bool HasSupervisor(Guid userId) => _supervisors.Any(s => s.UserId == userId);
+ 
++    // [leadsGroups]: the supervisor still leads one of this company's groups (reassign them first).
++    public Result RemoveSupervisor(Guid userId, bool leadsGroups)
++    {
++        var supervisor = _supervisors.FirstOrDefault(s => s.UserId == userId);
++        if (supervisor is null)
++        {
++            return Result.Failure(CompanyErrors.SupervisorNotOnRoster);
++        }
++
++        if (leadsGroups)
++        {
++            return Result.Failure(CompanyErrors.SupervisorLeadsGroups);
++        }
++
++        _supervisors.Remove(supervisor);
++        return Result.Success();
++    }
++
++    // Idempotent: suspending a suspended supervisor (or reactivating an active one) succeeds.
++    public Result SuspendSupervisor(Guid userId) => WithSupervisor(userId, s => s.Suspend());
++
++    public Result ReactivateSupervisor(Guid userId) => WithSupervisor(userId, s => s.Reactivate());
++
++    private Result WithSupervisor(Guid userId, Action<CompanySupervisor> change)
++    {
++        var supervisor = _supervisors.FirstOrDefault(s => s.UserId == userId);
++        if (supervisor is null)
++        {
++            return Result.Failure(CompanyErrors.SupervisorNotOnRoster);
++        }
++
++        change(supervisor);
++        return Result.Success();
++    }
++
+     public void Stop() => IsStopped = true;
+ 
+     public void Resume() => IsStopped = false;
+diff --git a/src/Labaik.Domain/Companies/CompanyErrors.cs b/src/Labaik.Domain/Companies/CompanyErrors.cs
+index 0d8eee9..4698da1 100644
+--- a/src/Labaik.Domain/Companies/CompanyErrors.cs
++++ b/src/Labaik.Domain/Companies/CompanyErrors.cs
+@@ -59,6 +59,12 @@ public static class CompanyErrors
+     public static Error SupervisorAlreadyAdded =>
+         Error.Conflict("Company.SupervisorAlreadyAdded", "This account is already one of the company's supervisors.");
+ 
++    public static Error SupervisorNotOnRoster =>
++        Error.NotFound("Company.SupervisorNotOnRoster", "This account is not one of the company's supervisors.");
++
++    public static Error SupervisorLeadsGroups =>
++        Error.Conflict("Company.SupervisorLeadsGroups", "The supervisor still leads groups of this company. Reassign them first.");
++
+     public static Error SupervisorNotFound =>
+         Error.NotFound("Company.SupervisorNotFound", "No supervisor with this email on the company's roster.");
+ 
+diff --git a/src/Labaik.Domain/Companies/CompanySupervisor.cs b/src/Labaik.Domain/Companies/CompanySupervisor.cs
+index 332337c..cb26c6e 100644
+--- a/src/Labaik.Domain/Companies/CompanySupervisor.cs
++++ b/src/Labaik.Domain/Companies/CompanySupervisor.cs
+@@ -3,10 +3,12 @@ using Labaik.Domain.Common;
+ namespace Labaik.Domain.Companies;
+ 
+ // A supervisor account on a company's roster. Only rostered supervisors can be assigned to its groups.
++// A suspended entry keeps the roster row; a supervisor suspended by every company they are on cannot sign in.
+ public sealed class CompanySupervisor : Entity
+ {
+     public Guid UserId { get; private set; }
+     public DateTimeOffset AddedAtUtc { get; private set; }
++    public bool IsSuspended { get; private set; }
+ 
+     private CompanySupervisor() { } // EF
+ 
+@@ -15,4 +17,8 @@ public sealed class CompanySupervisor : Entity
+         UserId = userId;
+         AddedAtUtc = addedAtUtc;
+     }
++
++    internal void Suspend() => IsSuspended = true;
++
++    internal void Reactivate() => IsSuspended = false;
+ }
+diff --git a/src/Labaik.Infrastructure/Identity/IdentityService.cs b/src/Labaik.Infrastructure/Identity/IdentityService.cs
+index 0dad5f8..dd8ef65 100644
+--- a/src/Labaik.Infrastructure/Identity/IdentityService.cs
++++ b/src/Labaik.Infrastructure/Identity/IdentityService.cs
+@@ -3,7 +3,9 @@ using Labaik.Application.Common.Models;
+ using Labaik.Domain.Common.Results;
+ using Labaik.Domain.Identity;
+ using Labaik.Application.Common.Authorization;
++using Labaik.Infrastructure.Persistence;
+ using Microsoft.AspNetCore.Identity;
++using Microsoft.EntityFrameworkCore;
+ using Microsoft.Extensions.Logging;
+ using Microsoft.Extensions.Options;
+ using System.Security.Cryptography;
+@@ -12,6 +14,7 @@ namespace Labaik.Infrastructure.Identity;
+ 
+ internal sealed class IdentityService(
+     UserManager<ApplicationUser> userManager,
++    AppDbContext context,
+     IVerificationCodeService verificationCodeService,
+     IRefreshTokenService refreshTokenService,
+     IOptions<AdminSettings> adminOptions,
+@@ -150,14 +153,31 @@ internal sealed class IdentityService(
+         => Error.Failure(code, string.Join(" ", result.Errors.Select(e => e.Description)));
+ 
+     // Every token issue (login, verify, Google, refresh) goes through here, so the bootstrap
+-    // Admin grant takes effect without a restart.
+-    private async Task<AuthUser> BuildAuthUserAsync(ApplicationUser user)
++    // Admin grant takes effect without a restart, and a suspended supervisor is refused.
++    private async Task<Result<AuthUser>> BuildAuthUserAsync(ApplicationUser user)
+     {
+         await EnsureBootstrapAdminAsync(user);
+         var roles = await userManager.GetRolesAsync(user);
++        if (roles.Contains(Roles.Supervisor) && !roles.Contains(Roles.Admin) && await IsSuspendedEverywhereAsync(user.Id))
++        {
++            return Error.Forbidden("Supervisor.Suspended", "This supervisor account is suspended by its company.");
++        }
++
+         return new AuthUser(user.Id, user.Email!, user.FullName, roles.ToList());
+     }
+ 
++    // On at least one company roster and suspended on all of them.
++    private async Task<bool> IsSuspendedEverywhereAsync(Guid userId)
++    {
++        var entries = await context.Companies
++            .AsNoTracking()
++            .SelectMany(c => c.Supervisors)
++            .Where(s => s.UserId == userId)
++            .Select(s => s.IsSuspended)
++            .ToListAsync();
++        return entries.Count > 0 && entries.All(suspended => suspended);
++    }
++
+     private async Task EnsureBootstrapAdminAsync(ApplicationUser user)
+     {
+         if (!user.EmailConfirmed || user.Email is null)
+@@ -344,6 +364,27 @@ internal sealed class IdentityService(
+         return Result.Success(); // always 200: no user enumeration
+     }
+ 
++    public async Task<Result<ProvisionedAccount>> IssueTemporaryPasswordAsync(Guid userId, CancellationToken cancellationToken = default)
++    {
++        var user = await userManager.FindByIdAsync(userId.ToString());
++        if (user is null)
++        {
++            return Error.NotFound("User.NotFound", "No account found.");
++        }
++
++        var temporaryPassword = GenerateTemporaryPassword();
++        var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
++        var reset = await userManager.ResetPasswordAsync(user, resetToken, temporaryPassword);
++        if (!reset.Succeeded)
++        {
++            return IdentityFailure("Auth.ResetFailed", reset);
++        }
++
++        await refreshTokenService.RevokeAllForUserAsync(user.Id, cancellationToken);
++        logger.LogInformation("Issued a new temporary password for user {UserId}.", user.Id);
++        return new ProvisionedAccount(user.Id, user.Email!, user.FullName, temporaryPassword);
++    }
++
+     public async Task<Result> ResetPasswordAsync(
+         string email, string code, string newPassword, CancellationToken cancellationToken = default)
+     {
+diff --git a/src/Labaik.Infrastructure/Persistence/Migrations/20261020190621_AddSupervisorSuspension.Designer.cs b/src/Labaik.Infrastructure/Persistence/Migrations/20261020190621_AddSupervisorSuspension.Designer.cs
+new file mode 100644
+index 0000000..9a259e1
+--- /dev/null
++++ b/src/Labaik.Infrastructure/Persistence/Migrations/20261020190621_AddSupervisorSuspension.Designer.cs
+@@ -0,0 +1,1429 @@
++﻿// <auto-generated />
++using System;
++using System.Collections.Generic;
++using Labaik.Infrastructure.Persistence;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.EntityFrameworkCore.Infrastructure;
++using Microsoft.EntityFrameworkCore.Migrations;
++using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
++using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
++
++#nullable disable
++
++namespace Labaik.Infrastructure.Persistence.Migrations
++{
++    [DbContext(typeof(AppDbContext))]
++    [Migration("20261020190621_AddSupervisorSuspension")]
++    partial class AddSupervisorSuspension
++    {
++        /// <inheritdoc />
++        protected override void BuildTargetModel(ModelBuilder modelBuilder)
++        {
++#pragma warning disable 612, 618
++            modelBuilder
++                .HasAnnotation("ProductVersion", "10.0.12")
++                .HasAnnotation("Relational:MaxIdentifierLength", 63);
++
++            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
++
++            modelBuilder.Entity("Labaik.Domain.Announcements.Announcement", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<int>("Audience")
++                        .HasColumnType("integer");
++
++                    b.Property<Guid>("AuthorId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("Body")
++                        .IsRequired()
++                        .HasMaxLength(4000)
++                        .HasColumnType("character varying(4000)");
++
++                    b.Property<Guid?>("CompanyId")
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTimeOffset>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<DateTimeOffset?>("GatheringTimeUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid?>("GroupId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("ImageUrl")
++                        .HasMaxLength(500)
++                        .HasColumnType("character varying(500)");
++
++                    b.Property<int>("Importance")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("Location")
++                        .HasMaxLength(300)
++                        .HasColumnType("character varying(300)");
++
++                    b.Property<string>("Title")
++                        .IsRequired()
++                        .HasMaxLength(200)
++                        .HasColumnType("character varying(200)");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("GroupId", "CreatedAtUtc");
++
++                    b.HasIndex("CompanyId", "Audience", "CreatedAtUtc");
++
++                    b.ToTable("Announcements", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Chat.ChatMessage", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("Body")
++                        .IsRequired()
++                        .HasMaxLength(2000)
++                        .HasColumnType("character varying(2000)");
++
++                    b.Property<Guid>("GroupId")
++                        .HasColumnType("uuid");
++
++                    b.Property<int>("Kind")
++                        .HasColumnType("integer");
++
++                    b.Property<double?>("Latitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<double?>("Longitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<Guid>("SenderId")
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTimeOffset>("SentAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("GroupId", "SentAtUtc");
++
++                    b.ToTable("ChatMessages", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Companies.Company", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<int?>("Category")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("City")
++                        .HasMaxLength(100)
++                        .HasColumnType("character varying(100)");
++
++                    b.Property<string>("CommercialRegistrationNumber")
++                        .IsRequired()
++                        .ValueGeneratedOnAdd()
++                        .HasMaxLength(50)
++                        .HasColumnType("character varying(50)")
++                        .HasDefaultValue("");
++
++                    b.Property<string>("ContactFullName")
++                        .IsRequired()
++                        .ValueGeneratedOnAdd()
++                        .HasMaxLength(150)
++                        .HasColumnType("character varying(150)")
++                        .HasDefaultValue("");
++
++                    b.Property<string>("ContactJobTitle")
++                        .HasMaxLength(100)
++                        .HasColumnType("character varying(100)");
++
++                    b.Property<string>("ContactMobile")
++                        .HasMaxLength(30)
++                        .HasColumnType("character varying(30)");
++
++                    b.Property<DateOnly?>("ContractEndDate")
++                        .HasColumnType("date");
++
++                    b.Property<string>("ContractFileUrl")
++                        .HasMaxLength(2048)
++                        .HasColumnType("character varying(2048)");
++
++                    b.Property<string>("ContractReferenceNumber")
++                        .HasMaxLength(50)
++                        .HasColumnType("character varying(50)");
++
++                    b.Property<DateOnly?>("ContractStartDate")
++                        .HasColumnType("date");
++
++                    b.Property<string>("Country")
++                        .HasMaxLength(100)
++                        .HasColumnType("character varying(100)");
++
++                    b.Property<DateTimeOffset>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<bool>("IsStopped")
++                        .HasColumnType("boolean");
++
++                    b.Property<string>("LogoUrl")
++                        .HasMaxLength(2048)
++                        .HasColumnType("character varying(2048)");
++
++                    b.Property<int?>("MaxPilgrims")
++                        .HasColumnType("integer");
++
++                    b.Property<int?>("MaxSupervisors")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("Name")
++                        .IsRequired()
++                        .HasMaxLength(150)
++                        .HasColumnType("character varying(150)");
++
++                    b.Property<string>("OfficialEmail")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.Property<Guid>("OwnerUserId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("PrimaryPhone")
++                        .HasMaxLength(30)
++                        .HasColumnType("character varying(30)");
++
++                    b.Property<int?>("SubscriptionPeriod")
++                        .HasColumnType("integer");
++
++                    b.Property<decimal?>("SubscriptionPrice")
++                        .HasPrecision(12, 2)
++                        .HasColumnType("numeric(12,2)");
++
++                    b.Property<string>("VatId")
++                        .HasMaxLength(50)
++                        .HasColumnType("character varying(50)");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("CommercialRegistrationNumber")
++                        .IsUnique()
++                        .HasFilter("\"CommercialRegistrationNumber\" <> ''");
++
++                    b.HasIndex("OwnerUserId")
++                        .IsUnique();
++
++                    b.ToTable("Companies", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.FamilyCircles.FamilyCircle", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTimeOffset>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("JoinCode")
++                        .IsRequired()
++                        .HasMaxLength(20)
++                        .HasColumnType("character varying(20)");
++
++                    b.Property<string>("Name")
++                        .IsRequired()
++                        .HasMaxLength(100)
++                        .HasColumnType("character varying(100)");
++
++                    b.Property<Guid>("OwnerId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("JoinCode")
++                        .IsUnique();
++
++                    b.ToTable("FamilyCircles", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Groups.Group", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<Guid?>("CompanyId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("JoinCode")
++                        .IsRequired()
++                        .HasMaxLength(20)
++                        .HasColumnType("character varying(20)");
++
++                    b.Property<int>("LastMemberNumber")
++                        .HasColumnType("integer");
++
++                    b.Property<Guid?>("LeaderId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("Name")
++                        .IsRequired()
++                        .HasMaxLength(100)
++                        .HasColumnType("character varying(100)");
++
++                    b.Property<Guid?>("TripId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("CompanyId");
++
++                    b.HasIndex("JoinCode")
++                        .IsUnique();
++
++                    b.HasIndex("TripId");
++
++                    b.ToTable("Groups", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Guides.GuideArticle", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("Body")
++                        .IsRequired()
++                        .HasColumnType("text");
++
++                    b.Property<int>("Category")
++                        .HasColumnType("integer");
++
++                    b.Property<bool>("IsPublished")
++                        .HasColumnType("boolean");
++
++                    b.Property<int>("Order")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("Reference")
++                        .HasMaxLength(500)
++                        .HasColumnType("character varying(500)");
++
++                    b.Property<string>("Title")
++                        .IsRequired()
++                        .HasMaxLength(200)
++                        .HasColumnType("character varying(200)");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("Category", "Order")
++                        .IsUnique();
++
++                    b.ToTable("GuideArticles", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.HelpCenter.LostChildReport", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<int>("ApproxAge")
++                        .HasColumnType("integer");
++
++                    b.Property<DateTimeOffset>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("Description")
++                        .IsRequired()
++                        .HasMaxLength(1000)
++                        .HasColumnType("character varying(1000)");
++
++                    b.Property<DateTimeOffset?>("FoundAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<double>("Latitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<string>("LocationDescription")
++                        .HasMaxLength(300)
++                        .HasColumnType("character varying(300)");
++
++                    b.Property<double>("Longitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<string>("PhotoUrl")
++                        .HasMaxLength(2048)
++                        .HasColumnType("character varying(2048)");
++
++                    b.Property<Guid>("ReporterId")
++                        .HasColumnType("uuid");
++
++                    b.Property<bool>("ShareWithNearby")
++                        .HasColumnType("boolean");
++
++                    b.Property<int>("Status")
++                        .HasColumnType("integer");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("ReporterId", "CreatedAtUtc");
++
++                    b.ToTable("LostChildReports", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Identity.RefreshToken", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTimeOffset>("CreatedAt")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<DateTimeOffset>("ExpiresAt")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<DateTimeOffset?>("RevokedAt")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("TokenHash")
++                        .IsRequired()
++                        .HasColumnType("text");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.ToTable("RefreshTokens");
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Identity.VerificationCode", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<int>("AttemptCount")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("CodeHash")
++                        .IsRequired()
++                        .HasColumnType("text");
++
++                    b.Property<DateTimeOffset>("CreatedAt")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<DateTimeOffset>("ExpiresAt")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<bool>("IsUsed")
++                        .HasColumnType("boolean");
++
++                    b.Property<int>("Purpose")
++                        .HasColumnType("integer");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.ToTable("VerificationCodes");
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Journeys.Journey", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<bool>("IsFirstTime")
++                        .HasColumnType("boolean");
++
++                    b.Property<int>("PilgrimageType")
++                        .HasColumnType("integer");
++
++                    b.Property<int>("Status")
++                        .HasColumnType("integer");
++
++                    b.Property<int>("TravelParty")
++                        .HasColumnType("integer");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.ToTable("Journeys", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Locations.LocationShare", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<double?>("AccuracyMeters")
++                        .HasColumnType("double precision");
++
++                    b.Property<bool>("IsSharing")
++                        .HasColumnType("boolean");
++
++                    b.Property<double?>("Latitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<double?>("Longitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("UserId")
++                        .IsUnique();
++
++                    b.ToTable("LocationShares", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Map.EmergencyAlert", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<double?>("AccuracyMeters")
++                        .HasColumnType("double precision");
++
++                    b.Property<DateTimeOffset>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<double>("Latitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<double>("Longitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<string>("Note")
++                        .HasMaxLength(500)
++                        .HasColumnType("character varying(500)");
++
++                    b.Property<DateTimeOffset?>("ResolvedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid?>("ResolvedBy")
++                        .HasColumnType("uuid");
++
++                    b.Property<int>("Status")
++                        .HasColumnType("integer");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("UserId", "CreatedAtUtc");
++
++                    b.ToTable("EmergencyAlerts", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Map.MapPlace", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("Description")
++                        .HasMaxLength(1000)
++                        .HasColumnType("character varying(1000)");
++
++                    b.Property<int?>("FacilityKind")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("ImageUrl")
++                        .HasMaxLength(2048)
++                        .HasColumnType("character varying(2048)");
++
++                    b.Property<bool>("IsPublished")
++                        .HasColumnType("boolean");
++
++                    b.Property<string>("Key")
++                        .IsRequired()
++                        .HasMaxLength(50)
++                        .HasColumnType("character varying(50)");
++
++                    b.Property<double>("Latitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<double>("Longitude")
++                        .HasColumnType("double precision");
++
++                    b.Property<string>("Name")
++                        .IsRequired()
++                        .HasMaxLength(150)
++                        .HasColumnType("character varying(150)");
++
++                    b.Property<int?>("Number")
++                        .HasColumnType("integer");
++
++                    b.Property<int>("SortOrder")
++                        .HasColumnType("integer");
++
++                    b.Property<int>("Type")
++                        .HasColumnType("integer");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("Key")
++                        .IsUnique();
++
++                    b.HasIndex("Type", "SortOrder");
++
++                    b.ToTable("MapPlaces", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Notifications.Notification", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTimeOffset>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid?>("GroupId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("Preview")
++                        .HasMaxLength(200)
++                        .HasColumnType("character varying(200)");
++
++                    b.Property<DateTimeOffset?>("ReadAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid?>("ReferenceId")
++                        .HasColumnType("uuid");
++
++                    b.Property<int>("Type")
++                        .HasColumnType("integer");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("UserId", "CreatedAtUtc");
++
++                    b.HasIndex("UserId", "ReadAtUtc");
++
++                    b.ToTable("Notifications", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Profiles.PilgrimProfile", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<int?>("Gender")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("HealthNotes")
++                        .HasMaxLength(2000)
++                        .HasColumnType("character varying(2000)");
++
++                    b.Property<string>("Nationality")
++                        .HasMaxLength(2)
++                        .HasColumnType("character varying(2)");
++
++                    b.Property<string>("PhotoUrl")
++                        .HasMaxLength(500)
++                        .HasColumnType("character varying(500)");
++
++                    b.Property<DateTimeOffset>("UpdatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("UserId")
++                        .IsUnique();
++
++                    b.ToTable("PilgrimProfiles", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Rituals.RitualProgress", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTimeOffset?>("CompletedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<int>("CurrentOrder")
++                        .HasColumnType("integer");
++
++                    b.Property<int>("PilgrimageType")
++                        .HasColumnType("integer");
++
++                    b.Property<DateTimeOffset>("StartedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("UserId", "PilgrimageType")
++                        .IsUnique();
++
++                    b.ToTable("RitualProgresses", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Rituals.RitualStep", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("Body")
++                        .IsRequired()
++                        .HasColumnType("text");
++
++                    b.Property<bool>("IsPublished")
++                        .HasColumnType("boolean");
++
++                    b.Property<int>("Kind")
++                        .HasColumnType("integer");
++
++                    b.Property<int>("Order")
++                        .HasColumnType("integer");
++
++                    b.Property<int>("Phase")
++                        .HasColumnType("integer");
++
++                    b.Property<int>("PilgrimageType")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("Reference")
++                        .HasMaxLength(500)
++                        .HasColumnType("character varying(500)");
++
++                    b.Property<string>("Title")
++                        .IsRequired()
++                        .HasMaxLength(200)
++                        .HasColumnType("character varying(200)");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("PilgrimageType", "Order")
++                        .IsUnique();
++
++                    b.ToTable("RitualSteps", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Trips.Trip", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<Guid>("CompanyId")
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTimeOffset>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<DateOnly>("DepartureDate")
++                        .HasColumnType("date");
++
++                    b.Property<string>("DeparturePlace")
++                        .IsRequired()
++                        .HasMaxLength(200)
++                        .HasColumnType("character varying(200)");
++
++                    b.Property<int>("ExpectedPilgrims")
++                        .HasColumnType("integer");
++
++                    b.Property<DateTimeOffset?>("ItineraryUpdatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("Name")
++                        .IsRequired()
++                        .HasMaxLength(150)
++                        .HasColumnType("character varying(150)");
++
++                    b.Property<string>("Notes")
++                        .HasMaxLength(2000)
++                        .HasColumnType("character varying(2000)");
++
++                    b.Property<int>("PilgrimageType")
++                        .HasColumnType("integer");
++
++                    b.Property<DateOnly?>("ReturnDate")
++                        .HasColumnType("date");
++
++                    b.PrimitiveCollection<List<string>>("_destinations")
++                        .IsRequired()
++                        .HasColumnType("text[]")
++                        .HasColumnName("Destinations");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("CompanyId", "DepartureDate");
++
++                    b.ToTable("Trips", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Infrastructure.Identity.ApplicationUser", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<int>("AccessFailedCount")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("ConcurrencyStamp")
++                        .IsConcurrencyToken()
++                        .HasColumnType("text");
++
++                    b.Property<string>("Email")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.Property<bool>("EmailConfirmed")
++                        .HasColumnType("boolean");
++
++                    b.Property<string>("FullName")
++                        .IsRequired()
++                        .HasColumnType("text");
++
++                    b.Property<bool>("LockoutEnabled")
++                        .HasColumnType("boolean");
++
++                    b.Property<DateTimeOffset?>("LockoutEnd")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("NormalizedEmail")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.Property<string>("NormalizedUserName")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.Property<string>("PasswordHash")
++                        .HasColumnType("text");
++
++                    b.Property<string>("PhoneNumber")
++                        .HasColumnType("text");
++
++                    b.Property<bool>("PhoneNumberConfirmed")
++                        .HasColumnType("boolean");
++
++                    b.Property<string>("SecurityStamp")
++                        .HasColumnType("text");
++
++                    b.Property<bool>("TwoFactorEnabled")
++                        .HasColumnType("boolean");
++
++                    b.Property<string>("UserName")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("NormalizedEmail")
++                        .HasDatabaseName("EmailIndex");
++
++                    b.HasIndex("NormalizedUserName")
++                        .IsUnique()
++                        .HasDatabaseName("UserNameIndex");
++
++                    b.ToTable("AspNetUsers", (string)null);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("ConcurrencyStamp")
++                        .IsConcurrencyToken()
++                        .HasColumnType("text");
++
++                    b.Property<string>("Name")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.Property<string>("NormalizedName")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("NormalizedName")
++                        .IsUnique()
++                        .HasDatabaseName("RoleNameIndex");
++
++                    b.ToTable("AspNetRoles", (string)null);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
++                {
++                    b.Property<int>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("integer");
++
++                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
++
++                    b.Property<string>("ClaimType")
++                        .HasColumnType("text");
++
++                    b.Property<string>("ClaimValue")
++                        .HasColumnType("text");
++
++                    b.Property<Guid>("RoleId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("RoleId");
++
++                    b.ToTable("AspNetRoleClaims", (string)null);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
++                {
++                    b.Property<int>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("integer");
++
++                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
++
++                    b.Property<string>("ClaimType")
++                        .HasColumnType("text");
++
++                    b.Property<string>("ClaimValue")
++                        .HasColumnType("text");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("UserId");
++
++                    b.ToTable("AspNetUserClaims", (string)null);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
++                {
++                    b.Property<string>("LoginProvider")
++                        .HasColumnType("text");
++
++                    b.Property<string>("ProviderKey")
++                        .HasColumnType("text");
++
++                    b.Property<string>("ProviderDisplayName")
++                        .HasColumnType("text");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("LoginProvider", "ProviderKey");
++
++                    b.HasIndex("UserId");
++
++                    b.ToTable("AspNetUserLogins", (string)null);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
++                {
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.Property<Guid>("RoleId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("UserId", "RoleId");
++
++                    b.HasIndex("RoleId");
++
++                    b.ToTable("AspNetUserRoles", (string)null);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
++                {
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("LoginProvider")
++                        .HasColumnType("text");
++
++                    b.Property<string>("Name")
++                        .HasColumnType("text");
++
++                    b.Property<string>("Value")
++                        .HasColumnType("text");
++
++                    b.HasKey("UserId", "LoginProvider", "Name");
++
++                    b.ToTable("AspNetUserTokens", (string)null);
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Announcements.Announcement", b =>
++                {
++                    b.OwnsMany("Labaik.Domain.Announcements.AnnouncementRead", "Reads", b1 =>
++                        {
++                            b1.Property<Guid>("Id")
++                                .HasColumnType("uuid");
++
++                            b1.Property<Guid>("AnnouncementId")
++                                .HasColumnType("uuid");
++
++                            b1.Property<DateTimeOffset>("ReadAtUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.Property<Guid>("UserId")
++                                .HasColumnType("uuid");
++
++                            b1.HasKey("Id");
++
++                            b1.HasIndex("AnnouncementId", "UserId")
++                                .IsUnique();
++
++                            b1.ToTable("AnnouncementReads", (string)null);
++
++                            b1.WithOwner()
++                                .HasForeignKey("AnnouncementId");
++                        });
++
++                    b.Navigation("Reads");
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Companies.Company", b =>
++                {
++                    b.OwnsOne("Labaik.Domain.Companies.CompanyServices", "EnabledServices", b1 =>
++                        {
++                            b1.Property<Guid>("CompanyId")
++                                .HasColumnType("uuid");
++
++                            b1.Property<bool>("ChatWithGuides")
++                                .HasColumnType("boolean")
++                                .HasColumnName("ServiceChatWithGuides");
++
++                            b1.Property<bool>("DuaAndRituals")
++                                .HasColumnType("boolean")
++                                .HasColumnName("ServiceDuaAndRituals");
++
++                            b1.Property<bool>("GpsTracking")
++                                .HasColumnType("boolean")
++                                .HasColumnName("ServiceGpsTracking");
++
++                            b1.Property<bool>("InstantNotifications")
++                                .HasColumnType("boolean")
++                                .HasColumnName("ServiceInstantNotifications");
++
++                            b1.Property<bool>("ReportsAndStats")
++                                .HasColumnType("boolean")
++                                .HasColumnName("ServiceReportsAndStats");
++
++                            b1.HasKey("CompanyId");
++
++                            b1.ToTable("Companies");
++
++                            b1.WithOwner()
++                                .HasForeignKey("CompanyId");
++                        });
++
++                    b.OwnsMany("Labaik.Domain.Companies.CompanySupervisor", "Supervisors", b1 =>
++                        {
++                            b1.Property<Guid>("Id")
++                                .HasColumnType("uuid");
++
++                            b1.Property<DateTimeOffset>("AddedAtUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.Property<Guid>("CompanyId")
++                                .HasColumnType("uuid");
++
++                            b1.Property<bool>("IsSuspended")
++                                .HasColumnType("boolean");
++
++                            b1.Property<Guid>("UserId")
++                                .HasColumnType("uuid");
++
++                            b1.HasKey("Id");
++
++                            b1.HasIndex("CompanyId");
++
++                            b1.HasIndex("UserId", "CompanyId")
++                                .IsUnique();
++
++                            b1.ToTable("CompanySupervisors", (string)null);
++
++                            b1.WithOwner()
++                                .HasForeignKey("CompanyId");
++                        });
++
++                    b.Navigation("EnabledServices")
++                        .IsRequired();
++
++                    b.Navigation("Supervisors");
++                });
++
++            modelBuilder.Entity("Labaik.Domain.FamilyCircles.FamilyCircle", b =>
++                {
++                    b.OwnsMany("Labaik.Domain.FamilyCircles.FamilyCircleMember", "Members", b1 =>
++                        {
++                            b1.Property<Guid>("Id")
++                                .HasColumnType("uuid");
++
++                            b1.Property<Guid>("CircleId")
++                                .HasColumnType("uuid");
++
++                            b1.Property<bool>("IsSharingLocation")
++                                .HasColumnType("boolean");
++
++                            b1.Property<DateTimeOffset>("JoinedAtUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.Property<int>("Role")
++                                .HasColumnType("integer");
++
++                            b1.Property<Guid>("UserId")
++                                .HasColumnType("uuid");
++
++                            b1.HasKey("Id");
++
++                            b1.HasIndex("CircleId");
++
++                            b1.HasIndex("UserId", "CircleId")
++                                .IsUnique();
++
++                            b1.ToTable("FamilyCircleMembers", (string)null);
++
++                            b1.WithOwner()
++                                .HasForeignKey("CircleId");
++                        });
++
++                    b.Navigation("Members");
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Groups.Group", b =>
++                {
++                    b.HasOne("Labaik.Domain.Companies.Company", null)
++                        .WithMany()
++                        .HasForeignKey("CompanyId")
++                        .OnDelete(DeleteBehavior.Restrict);
++
++                    b.HasOne("Labaik.Domain.Trips.Trip", null)
++                        .WithMany()
++                        .HasForeignKey("TripId")
++                        .OnDelete(DeleteBehavior.Restrict);
++
++                    b.OwnsMany("Labaik.Domain.Groups.GroupMember", "Members", b1 =>
++                        {
++                            b1.Property<Guid>("Id")
++                                .HasColumnType("uuid");
++
++                            b1.Property<DateTimeOffset?>("AttendanceConfirmedAtUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.Property<int>("AttendanceStatus")
++                                .HasColumnType("integer");
++
++                            b1.Property<DateTimeOffset?>("ChatLastReadAtUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.Property<Guid>("GroupId")
++                                .HasColumnType("uuid");
++
++                            b1.Property<DateTimeOffset>("JoinedAtUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.Property<int?>("MemberNumber")
++                                .HasColumnType("integer");
++
++                            b1.Property<string>("Notes")
++                                .HasMaxLength(2000)
++                                .HasColumnType("character varying(2000)");
++
++                            b1.Property<int>("Role")
++                                .HasColumnType("integer");
++
++                            b1.Property<Guid>("UserId")
++                                .HasColumnType("uuid");
++
++                            b1.HasKey("Id");
++
++                            b1.HasIndex("GroupId");
++
++                            b1.HasIndex("UserId", "GroupId")
++                                .IsUnique();
++
++                            b1.ToTable("GroupMembers", (string)null);
++
++                            b1.WithOwner()
++                                .HasForeignKey("GroupId");
++                        });
++
++                    b.OwnsOne("Labaik.Domain.Groups.ValueObjects.GatheringPoint", "GatheringPoint", b1 =>
++                        {
++                            b1.Property<Guid>("GroupId")
++                                .HasColumnType("uuid");
++
++                            b1.Property<string>("Address")
++                                .IsRequired()
++                                .HasMaxLength(300)
++                                .HasColumnType("character varying(300)");
++
++                            b1.Property<DateTimeOffset?>("GatheringTimeUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.Property<double>("Latitude")
++                                .HasColumnType("double precision");
++
++                            b1.Property<double>("Longitude")
++                                .HasColumnType("double precision");
++
++                            b1.Property<DateTimeOffset>("UpdatedAtUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.HasKey("GroupId");
++
++                            b1.ToTable("Groups");
++
++                            b1.WithOwner()
++                                .HasForeignKey("GroupId");
++                        });
++
++                    b.Navigation("GatheringPoint");
++
++                    b.Navigation("Members");
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Journeys.Journey", b =>
++                {
++                    b.OwnsMany("Labaik.Domain.Journeys.Stay", "Stays", b1 =>
++                        {
++                            b1.Property<Guid>("Id")
++                                .HasColumnType("uuid");
++
++                            b1.Property<int>("AccommodationType")
++                                .HasColumnType("integer");
++
++                            b1.Property<DateTimeOffset>("ArrivalAtUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.Property<string>("CityName")
++                                .IsRequired()
++                                .HasMaxLength(100)
++                                .HasColumnType("character varying(100)");
++
++                            b1.Property<Guid>("JourneyId")
++                                .HasColumnType("uuid");
++
++                            b1.Property<string>("PlaceName")
++                                .IsRequired()
++                                .HasMaxLength(200)
++                                .HasColumnType("character varying(200)");
++
++                            b1.HasKey("Id");
++
++                            b1.HasIndex("JourneyId");
++
++                            b1.ToTable("JourneyStays", (string)null);
++
++                            b1.WithOwner()
++                                .HasForeignKey("JourneyId");
++                        });
++
++                    b.OwnsOne("Labaik.Domain.Journeys.ValueObjects.ArrivalPlan", "ArrivalPlan", b1 =>
++                        {
++                            b1.Property<Guid>("JourneyId")
++                                .HasColumnType("uuid");
++
++                            b1.Property<string>("EntryPoint")
++                                .IsRequired()
++                                .HasMaxLength(200)
++                                .HasColumnType("character varying(200)");
++
++                            b1.Property<int>("Mode")
++                                .HasColumnType("integer");
++
++                            b1.HasKey("JourneyId");
++
++                            b1.ToTable("Journeys");
++
++                            b1.WithOwner()
++                                .HasForeignKey("JourneyId");
++                        });
++
++                    b.Navigation("ArrivalPlan");
++
++                    b.Navigation("Stays");
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Rituals.RitualProgress", b =>
++                {
++                    b.OwnsMany("Labaik.Domain.Rituals.CompletedRitualStep", "CompletedSteps", b1 =>
++                        {
++                            b1.Property<Guid>("Id")
++                                .HasColumnType("uuid");
++
++                            b1.Property<DateTimeOffset>("CompletedAtUtc")
++                                .HasColumnType("timestamp with time zone");
++
++                            b1.Property<Guid>("RitualProgressId")
++                                .HasColumnType("uuid");
++
++                            b1.Property<int>("StepOrder")
++                                .HasColumnType("integer");
++
++                            b1.HasKey("Id");
++
++                            b1.HasIndex("RitualProgressId", "StepOrder")
++                                .IsUnique();
++
++                            b1.ToTable("CompletedRitualSteps", (string)null);
++
++                            b1.WithOwner()
++                                .HasForeignKey("RitualProgressId");
++                        });
++
++                    b.Navigation("CompletedSteps");
++                });
++
++            modelBuilder.Entity("Labaik.Domain.Trips.Trip", b =>
++                {
++                    b.HasOne("Labaik.Domain.Companies.Company", null)
++                        .WithMany()
++                        .HasForeignKey("CompanyId")
++                        .OnDelete(DeleteBehavior.Restrict)
++                        .IsRequired();
++
++                    b.OwnsMany("Labaik.Domain.Trips.ItineraryDay", "Itinerary", b1 =>
++                        {
++                            b1.Property<Guid>("TripId");
++
++                            b1.Property<int>("__synthesizedOrdinal")
++                                .ValueGeneratedOnAdd();
++
++                            b1.Property<DateOnly>("Date");
++
++                            b1.Property<string>("Title");
++
++                            b1.HasKey("TripId", "__synthesizedOrdinal");
++
++                            b1.ToTable("Trips");
++
++                            b1
++                                .ToJson("Itinerary")
++                                .HasColumnType("jsonb");
++
++                            b1.WithOwner()
++                                .HasForeignKey("TripId");
++
++                            b1.OwnsMany("Labaik.Domain.Trips.ItineraryActivity", "Activities", b2 =>
++                                {
++                                    b2.Property<Guid>("ItineraryDayTripId");
++
++                                    b2.Property<int>("ItineraryDay__synthesizedOrdinal");
++
++                                    b2.Property<int>("__synthesizedOrdinal")
++                                        .ValueGeneratedOnAdd();
++
++                                    b2.Property<string>("Place");
++
++                                    b2.Property<DateTimeOffset?>("TimeUtc");
++
++                                    b2.Property<string>("Title")
++                                        .IsRequired();
++
++                                    b2.HasKey("ItineraryDayTripId", "ItineraryDay__synthesizedOrdinal", "__synthesizedOrdinal");
++
++                                    b2.ToTable("Trips");
++
++                                    b2.WithOwner()
++                                        .HasForeignKey("ItineraryDayTripId", "ItineraryDay__synthesizedOrdinal");
++                                });
++
++                            b1.Navigation("Activities");
++                        });
++
++                    b.Navigation("Itinerary");
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
++                {
++                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", null)
++                        .WithMany()
++                        .HasForeignKey("RoleId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
++                {
++                    b.HasOne("Labaik.Infrastructure.Identity.ApplicationUser", null)
++                        .WithMany()
++                        .HasForeignKey("UserId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
++                {
++                    b.HasOne("Labaik.Infrastructure.Identity.ApplicationUser", null)
++                        .WithMany()
++                        .HasForeignKey("UserId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
++                {
++                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", null)
++                        .WithMany()
++                        .HasForeignKey("RoleId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++
++                    b.HasOne("Labaik.Infrastructure.Identity.ApplicationUser", null)
++                        .WithMany()
++                        .HasForeignKey("UserId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
++                {
++                    b.HasOne("Labaik.Infrastructure.Identity.ApplicationUser", null)
++                        .WithMany()
++                        .HasForeignKey("UserId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++#pragma warning restore 612, 618
++        }
++    }
++}
+diff --git a/src/Labaik.Infrastructure/Persistence/Migrations/20261020190621_AddSupervisorSuspension.cs b/src/Labaik.Infrastructure/Persistence/Migrations/20261020190621_AddSupervisorSuspension.cs
+new file mode 100644
+index 0000000..9970a70
+--- /dev/null
++++ b/src/Labaik.Infrastructure/Persistence/Migrations/20261020190621_AddSupervisorSuspension.cs
+@@ -0,0 +1,29 @@
++﻿using Microsoft.EntityFrameworkCore.Migrations;
++
++#nullable disable
++
++namespace Labaik.Infrastructure.Persistence.Migrations
++{
++    /// <inheritdoc />
++    public partial class AddSupervisorSuspension : Migration
++    {
++        /// <inheritdoc />
++        protected override void Up(MigrationBuilder migrationBuilder)
++        {
++            migrationBuilder.AddColumn<bool>(
++                name: "IsSuspended",
++                table: "CompanySupervisors",
++                type: "boolean",
++                nullable: false,
++                defaultValue: false);
++        }
++
++        /// <inheritdoc />
++        protected override void Down(MigrationBuilder migrationBuilder)
++        {
++            migrationBuilder.DropColumn(
++                name: "IsSuspended",
++                table: "CompanySupervisors");
++        }
++    }
++}
+diff --git a/src/Labaik.Infrastructure/Persistence/Migrations/AppDbContextModelSnapshot.cs b/src/Labaik.Infrastructure/Persistence/Migrations/AppDbContextModelSnapshot.cs
+index cfce189..514482e 100644
+--- a/src/Labaik.Infrastructure/Persistence/Migrations/AppDbContextModelSnapshot.cs
++++ b/src/Labaik.Infrastructure/Persistence/Migrations/AppDbContextModelSnapshot.cs
+@@ -1062,6 +1062,9 @@ namespace Labaik.Infrastructure.Persistence.Migrations
+                             b1.Property<Guid>("CompanyId")
+                                 .HasColumnType("uuid");
+ 
++                            b1.Property<bool>("IsSuspended")
++                                .HasColumnType("boolean");
++
+                             b1.Property<Guid>("UserId")
+                                 .HasColumnType("uuid");
+ 
+diff --git a/tests/Labaik.Api.IntegrationTests/SupervisorRosterTests.cs b/tests/Labaik.Api.IntegrationTests/SupervisorRosterTests.cs
+index 0aba8d6..0640b20 100644
+--- a/tests/Labaik.Api.IntegrationTests/SupervisorRosterTests.cs
++++ b/tests/Labaik.Api.IntegrationTests/SupervisorRosterTests.cs
+@@ -70,4 +70,80 @@ public class SupervisorRosterTests(LabaikApiFactory factory)
+         var roster = await company.Client.GetFromJsonAsync<JsonElement>("/api/v1/company/supervisors");
+         Assert.Equal(1, Assert.Single(roster.EnumerateArray()).GetProperty("groupsCount").GetInt32());
+     }
++
++    [Fact]
++    public async Task Company_issues_a_new_temporary_password_that_replaces_the_old_one()
++    {
++        var (company, _) = await TestUsers.CreateCompanyAsync(factory);
++        var email = $"sup-{Guid.NewGuid():N}@labaik.test";
++        var created = await company.Client.PostAsJsonAsync("/api/v1/company/supervisors", new { fullName = "Temp Pass", email });
++        var userId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("userId").GetGuid();
++        var oldPassword = factory.Emails.TemporaryPasswordFor(email)!;
++
++        var issued = await company.Client.PostAsync($"/api/v1/company/supervisors/{userId}/temp-password", null);
++        Assert.Equal(HttpStatusCode.OK, issued.StatusCode);
++        var newPassword = (await issued.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("temporaryPassword").GetString()!;
++        Assert.Equal(newPassword, factory.Emails.TemporaryPasswordFor(email)); // emailed too
++        Assert.NotEqual(oldPassword, newPassword);
++
++        var anonymous = factory.CreateClient();
++        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync("/api/v1/auth/login", new { email, password = oldPassword })).StatusCode);
++        Assert.Equal(HttpStatusCode.OK, (await anonymous.PostAsJsonAsync("/api/v1/auth/login", new { email, password = newPassword })).StatusCode);
++
++        var (other, _) = await TestUsers.CreateCompanyAsync(factory);
++        Assert.Equal(HttpStatusCode.NotFound, (await other.Client.PostAsync($"/api/v1/company/supervisors/{userId}/temp-password", null)).StatusCode);
++    }
++
++    [Fact]
++    public async Task Suspended_supervisor_cannot_sign_in_or_refresh_until_reactivated()
++    {
++        var (company, _) = await TestUsers.CreateCompanyAsync(factory);
++        var email = $"sup-{Guid.NewGuid():N}@labaik.test";
++        var created = await company.Client.PostAsJsonAsync("/api/v1/company/supervisors", new { fullName = "Suspend Me", email });
++        var userId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("userId").GetGuid();
++        var supervisor = await TestUsers.SignInProvisionedAsync(factory, email);
++        var password = factory.Emails.TemporaryPasswordFor(email)!;
++        var anonymous = factory.CreateClient();
++
++        Assert.Equal(HttpStatusCode.NoContent, (await company.Client.PostAsync($"/api/v1/company/supervisors/{userId}/disable", null)).StatusCode);
++        var roster = await company.Client.GetFromJsonAsync<JsonElement>("/api/v1/company/supervisors");
++        Assert.True(Assert.Single(roster.EnumerateArray()).GetProperty("isSuspended").GetBoolean());
++
++        var login = await anonymous.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
++        Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
++        Assert.Equal("Supervisor.Suspended", (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
++        var refresh = await anonymous.PostAsJsonAsync("/api/v1/auth/refresh-token", new { refreshToken = supervisor.RefreshToken });
++        Assert.NotEqual(HttpStatusCode.OK, refresh.StatusCode); // sessions revoked on suspension
++
++        Assert.Equal(HttpStatusCode.NoContent, (await company.Client.PostAsync($"/api/v1/company/supervisors/{userId}/enable", null)).StatusCode);
++        Assert.Equal(HttpStatusCode.OK, (await anonymous.PostAsJsonAsync("/api/v1/auth/login", new { email, password })).StatusCode);
++    }
++
++    [Fact]
++    public async Task Company_removes_a_supervisor_only_after_their_groups_are_reassigned()
++    {
++        var (company, _) = await TestUsers.CreateCompanyAsync(factory);
++        var supervisor = await TestUsers.CreateAsync(factory);
++        await TestUsers.AddToRosterAsync(company, supervisor);
++        var groupId = await CompanyGroupTests.CreateTripGroupAsync(company);
++        Assert.Equal(HttpStatusCode.OK, (await company.Client.PutAsJsonAsync($"/api/v1/company/groups/{groupId}/supervisor", new { email = supervisor.Email })).StatusCode);
++
++        var blocked = await company.Client.DeleteAsync($"/api/v1/company/supervisors/{supervisor.Id}");
++        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
++        Assert.Equal("Company.SupervisorLeadsGroups", (await blocked.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
++
++        var replacement = await TestUsers.CreateAsync(factory);
++        await TestUsers.AddToRosterAsync(company, replacement);
++        Assert.Equal(HttpStatusCode.OK, (await company.Client.PutAsJsonAsync($"/api/v1/company/groups/{groupId}/supervisor", new { email = replacement.Email })).StatusCode);
++
++        Assert.Equal(HttpStatusCode.NoContent, (await company.Client.DeleteAsync($"/api/v1/company/supervisors/{supervisor.Id}")).StatusCode);
++        var roster = await company.Client.GetFromJsonAsync<JsonElement>("/api/v1/company/supervisors");
++        Assert.Equal(replacement.Email, Assert.Single(roster.EnumerateArray()).GetProperty("email").GetString());
++        Assert.Equal(HttpStatusCode.NotFound, (await company.Client.DeleteAsync($"/api/v1/company/supervisors/{supervisor.Id}")).StatusCode);
++
++        // Off every roster: the Supervisor role is gone from the next token.
++        var refreshed = await TestUsers.RefreshAsync(factory, supervisor);
++        var me = await refreshed.Client.GetFromJsonAsync<JsonElement>("/api/v1/auth/me");
++        Assert.DoesNotContain("Supervisor", me.GetProperty("roles").EnumerateArray().Select(r => r.GetString()));
++    }
+ }
+diff --git a/tests/Labaik.Domain.Tests/CompanyTests.cs b/tests/Labaik.Domain.Tests/CompanyTests.cs
+index 001eb87..3b710dc 100644
+--- a/tests/Labaik.Domain.Tests/CompanyTests.cs
++++ b/tests/Labaik.Domain.Tests/CompanyTests.cs
+@@ -98,6 +98,28 @@ public class CompanyTests
+         Assert.Single(company.Supervisors);
+     }
+ 
++    [Fact]
++    public void Roster_supervisor_can_be_suspended_reactivated_and_removed_unless_leading_groups()
++    {
++        var company = NewCompany(Guid.NewGuid());
++        var supervisor = Guid.NewGuid();
++        company.AddSupervisor(supervisor, Now);
++
++        Assert.True(company.SuspendSupervisor(supervisor).IsSuccess);
++        Assert.True(company.SuspendSupervisor(supervisor).IsSuccess); // idempotent
++        Assert.True(Assert.Single(company.Supervisors).IsSuspended);
++        Assert.True(company.ReactivateSupervisor(supervisor).IsSuccess);
++        Assert.False(Assert.Single(company.Supervisors).IsSuspended);
++
++        Assert.Equal("Company.SupervisorNotOnRoster", company.SuspendSupervisor(Guid.NewGuid()).Error!.Code);
++        Assert.Equal("Company.SupervisorNotOnRoster", company.RemoveSupervisor(Guid.NewGuid(), leadsGroups: false).Error!.Code);
++        Assert.Equal("Company.SupervisorLeadsGroups", company.RemoveSupervisor(supervisor, leadsGroups: true).Error!.Code);
++        Assert.Single(company.Supervisors);
++
++        Assert.True(company.RemoveSupervisor(supervisor, leadsGroups: false).IsSuccess);
++        Assert.Empty(company.Supervisors);
++    }
++
+     [Fact]
+     public void Status_and_days_remaining_follow_the_contract_and_stop_flag()
+     {
+-- 
+2.43.0
+
