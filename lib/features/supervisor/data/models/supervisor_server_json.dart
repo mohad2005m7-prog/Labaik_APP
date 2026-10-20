@@ -89,7 +89,9 @@ abstract final class SupervisorServerJson {
       days.add(target);
     }
     (target['activities'] as List).add({'title': title.trim(), 'timeUtc': time?.toUtc().toIso8601String(), 'place': (place?.trim().isEmpty ?? true) ? null : place!.trim()});
-    (target['activities'] as List).sort((a, b) => (a['timeUtc']?.toString() ?? '~').compareTo(b['timeUtc']?.toString() ?? '~'));
+    // بالوقت (المحفوظ من السيرفر والجديد ممكن يختلف شكل كتابتهم) — بلا وقت بآخر اليوم
+    DateTime at(Object? v) => DateTime.tryParse(v?.toString() ?? '') ?? DateTime(9999);
+    (target['activities'] as List).sort((a, b) => at((a as Map)['timeUtc']).compareTo(at((b as Map)['timeUtc'])));
     days.sort((a, b) => a['date'].toString().compareTo(b['date'].toString()));
     return days;
   }

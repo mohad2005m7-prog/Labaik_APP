@@ -65,7 +65,16 @@ class CompanyRepositoryImpl implements CompanyRepository {
   @override
   Future<List<CompanyGroup>> groups() async {
     final trips = [for (final t in await _api.trips()) CompanyJson.trip(t)];
-    final perTrip = await Future.wait([for (final t in trips) _api.tripGroups(t.id)]);
+    // رحلة وحدة فشلت ما بتوقّف الباقي (مجموعاتها بتغيب لحد التحديث الجاي) — بس لو كلهم فشلوا فهو خطأ (مش "ما في مجموعات")
+    Object? failure;
+    final perTrip = await Future.wait([
+      for (final t in trips)
+        _api.tripGroups(t.id).catchError((Object e) {
+          failure = e;
+          return const <Map<String, dynamic>>[];
+        }),
+    ]);
+    if (failure != null && perTrip.every((g) => g.isEmpty)) throw failure!;
     final today = DateTime.now();
     return [
       for (final (i, list) in perTrip.indexed)
