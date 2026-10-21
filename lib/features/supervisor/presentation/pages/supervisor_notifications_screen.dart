@@ -6,6 +6,7 @@ import '../../../../core/utils/figma_canvas.dart';
 import '../../domain/entities/supervisor_inbox.dart';
 import '../cubits/supervisor_content_cubits.dart';
 import '../l10n/sup_notifications_text.dart';
+import '../widgets/sup_list_status.dart';
 import '../widgets/supervisor_colors.dart';
 import '../widgets/supervisor_page.dart';
 import '../widgets/supervisor_widgets.dart';
@@ -33,6 +34,12 @@ class SupervisorNotificationsScreen extends StatelessWidget {
           height: 818 - _listTop,
           child: BlocBuilder<SupervisorNotificationsCubit, ListState<NotificationSection>>(
             builder: (context, state) {
+              if (state.items.isEmpty) {
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: SupListStatus(loaded: state.loaded, failed: state.failed, isEmpty: true, empty: SupListStatusText.noNotifications, onRetry: context.read<SupervisorNotificationsCubit>().load),
+                );
+              }
               final items = <Widget>[];
               var y = 110.0;
               for (final section in state.items) {

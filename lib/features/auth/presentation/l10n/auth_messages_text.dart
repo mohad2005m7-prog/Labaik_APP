@@ -21,6 +21,8 @@ abstract final class AuthMessagesText {
   static const accountDisabled = Tx('هذا الحساب موقوف، تواصل مع الإدارة', 'This account is disabled, please contact support');
   static const supervisorSuspended = Tx('حسابك كمشرف موقوف من الشركة، تواصل معها', 'Your supervisor account is suspended by your company');
   static const emailNotConfirmed = Tx('البريد الإلكتروني غير مؤكد بعد', 'Your email is not confirmed yet');
+  static const codeExpired = Tx('انتهت صلاحية الرمز، اطلب رمزاً جديداً', 'The code has expired, request a new one');
+  static const weakOrInvalid = Tx('كلمة المرور الجديدة غير مقبولة: 8 أحرف على الأقل وفيها حرف كبير وصغير ورقم ورمز', 'The new password is not accepted: at least 8 characters with upper and lower case, a number and a symbol');
   static const changeFailed = Tx('تعذّر تغيير كلمة المرور، حاول مرة أخرى', "Couldn't change the password, please try again");
   static const dashboardOnly = Tx('هذا الحساب للوحة التحكم على الويب فقط', 'This account is for the web dashboard only');
 }

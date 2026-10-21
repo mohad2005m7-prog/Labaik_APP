@@ -13,6 +13,7 @@ import '../cubits/announcements_cubit.dart';
 import '../cubits/supervisor_content_cubits.dart';
 import '../l10n/announcements_text.dart';
 import '../widgets/photo_picker.dart';
+import '../widgets/sup_list_status.dart';
 import '../widgets/supervisor_colors.dart';
 import '../widgets/supervisor_page.dart';
 import '../widgets/supervisor_widgets.dart';
@@ -104,7 +105,12 @@ class _PreviousList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AnnouncementsCubit, AnnouncementsState>(
-      builder: (context, state) => ListView.builder(
+      builder: (context, state) => state.items.isEmpty
+          ? Align(
+              alignment: Alignment.topCenter,
+              child: SupListStatus(loaded: state.loaded, failed: state.failed, isEmpty: true, empty: SupListStatusText.noAnnouncements, onRetry: context.read<AnnouncementsCubit>().load),
+            )
+          : ListView.builder(
         // أول كرت عند y160 (الصفحة بتبدأ 140) — وآخر واحد فوق شريط التنقل
         padding: EdgeInsets.only(top: c.s.y(10), bottom: c.s.y(49)),
         physics: supScrollPhysics,

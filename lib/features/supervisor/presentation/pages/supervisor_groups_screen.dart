@@ -7,6 +7,7 @@ import '../../domain/entities/supervisor_group.dart';
 import '../controllers/supervisor_controller.dart';
 import '../cubits/supervisor_content_cubits.dart';
 import '../l10n/sup_groups_text.dart';
+import '../widgets/sup_list_status.dart';
 import '../widgets/supervisor_colors.dart';
 import '../widgets/supervisor_page.dart';
 import '../widgets/supervisor_widgets.dart';
@@ -37,6 +38,12 @@ class SupervisorGroupsScreen extends StatelessWidget {
           child: BlocBuilder<SupervisorGroupsCubit, ListState<SupervisorGroup>>(
             builder: (context, state) {
               final groups = state.visible;
+              if (groups.isEmpty) {
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: SupListStatus(loaded: state.loaded, failed: state.failed, isEmpty: true, empty: SupListStatusText.noGroups, onRetry: context.read<SupervisorGroupsCubit>().load),
+                );
+              }
               return ListView.builder(
                 padding: EdgeInsets.zero,
                 physics: supScrollPhysics,

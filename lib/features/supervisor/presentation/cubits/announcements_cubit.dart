@@ -20,10 +20,13 @@ class AnnouncementsState extends Equatable {
   final bool loaded;
   final List<Announcement> items;
 
-  const AnnouncementsState({this.loaded = false, this.items = const []});
+  /// آخر تحميل فشل (بنضل على آخر قائمة)
+  final bool failed;
+
+  const AnnouncementsState({this.loaded = false, this.items = const [], this.failed = false});
 
   @override
-  List<Object?> get props => [loaded, items];
+  List<Object?> get props => [loaded, items, failed];
 }
 
 class AnnouncementsCubit extends Cubit<AnnouncementsState> {
@@ -37,7 +40,7 @@ class AnnouncementsCubit extends Cubit<AnnouncementsState> {
       if (!isClosed) emit(AnnouncementsState(loaded: true, items: items));
     } catch (_) {
       // ما في إنترنت أو السيرفر ما رد — بنضل على آخر قائمة
-      if (!isClosed) emit(AnnouncementsState(loaded: true, items: state.items));
+      if (!isClosed) emit(AnnouncementsState(loaded: true, items: state.items, failed: true));
     }
   }
 

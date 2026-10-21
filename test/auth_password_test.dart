@@ -2,6 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/testing.dart';
+import 'package:http/http.dart' as http;
+import 'package:labaik/core/network/api_exception.dart';
+import 'package:labaik/core/network/api_client.dart';
+import 'package:labaik/core/network/session_events.dart';
 import 'package:labaik/core/l10n/app_language.dart';
 import 'package:labaik/core/utils/token_storage.dart';
 import 'package:labaik/features/auth/data/auth_api_service.dart';
@@ -59,5 +64,42 @@ void main() {
     await tester.tap(text('تحديث كلمة المرور'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(text('كلمة المرور الجديدة لازم تختلف عن الحالية'), findsOneWidget);
+  });
+
+  testWidgets('password reset: the code goes to the new password screen (reset-password checks it), no verify-email call', (tester) async {
+    late BuildContext ctx;
+    await tester.pumpWidget(MaterialApp(home: Builder(builder: (c) {
+      ctx = c;
+      return const SizedBox();
+    })));
+    var loading = false;
+    await AuthController.verifyEmail(context: ctx, email: 'sup@x.test', code: '123456', isPasswordReset: true, setLoading: (v) => loading = v);
+    await tester.pumpAndSettle();
+    final screen = tester.widget<CreateNewPasswordScreen>(find.byType(CreateNewPasswordScreen));
+    expect((screen.email, screen.code, screen.isChange, loading), ('sup@x.test', '123456', false, false));
+  });
+
+  test('session ended: a 401 after refresh and 403 Auth.PasswordChangeRequired reach the handler once', () async {
+    final codes = <String?>[];
+    SessionEvents.handler = codes.add;
+    addTearDown(() {
+      SessionEvents.handler = null;
+      SessionEvents.reset();
+    });
+    ApiClient client(int status, String? code) => ApiClient(
+          baseUrl: 'https://x/api/v1',
+          accessToken: () async => 't',
+          refreshToken: () async => null,
+          client: MockClient((_) async => http.Response(jsonEncode({'status': status, 'code': ?code}), status, headers: {'content-type': 'application/json'})),
+        );
+    await expectLater(client(401, null).getJson('/supervisor/groups'), throwsA(isA<ApiException>()));
+    await expectLater(client(401, null).getJson('/home'), throwsA(isA<ApiException>()));
+    expect(codes, ['Auth.Unauthorized']); // مرة وحدة لحد ما يدخل من جديد
+    SessionEvents.reset();
+    await expectLater(client(403, 'Auth.PasswordChangeRequired').getJson('/home'), throwsA(isA<ApiException>()));
+    expect(codes.last, 'Auth.PasswordChangeRequired');
+    SessionEvents.reset();
+    await expectLater(client(403, 'Company.ServiceDisabled').getJson('/chats'), throwsA(isA<ApiException>()));
+    expect(codes, hasLength(2)); // خدمة مقفلة مش انتهاء جلسة
   });
 }

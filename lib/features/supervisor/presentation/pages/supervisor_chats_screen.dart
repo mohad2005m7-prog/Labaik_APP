@@ -7,6 +7,7 @@ import '../../domain/entities/supervisor_inbox.dart';
 import '../controllers/supervisor_controller.dart';
 import '../cubits/supervisor_content_cubits.dart';
 import '../l10n/sup_chats_text.dart';
+import '../widgets/sup_list_status.dart';
 import '../widgets/supervisor_colors.dart';
 import '../widgets/supervisor_page.dart';
 import '../widgets/supervisor_widgets.dart';
@@ -40,6 +41,12 @@ class SupervisorChatsScreen extends StatelessWidget {
           child: BlocBuilder<SupervisorChatsCubit, ListState<ChatThread>>(
             builder: (context, state) {
               final chats = state.visible;
+              if (chats.isEmpty) {
+                return Align(
+                  alignment: Alignment.topCenter,
+                  child: SupListStatus(loaded: state.loaded, failed: state.failed, isEmpty: true, empty: SupListStatusText.noChats, onRetry: context.read<SupervisorChatsCubit>().load),
+                );
+              }
               return ListView.builder(
                 padding: EdgeInsets.zero,
                 physics: supScrollPhysics,

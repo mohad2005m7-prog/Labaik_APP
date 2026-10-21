@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../network/session_events.dart';
+
 // -------------------------------------------------------------
 // TokenStorage
 // مسؤول عن حفظ/قراءة/حذف الـ accessToken و refreshToken محلياً
@@ -17,6 +19,8 @@ class TokenStorage {
     String? refreshToken,
   }) async {
     if (accessToken == null || accessToken.isEmpty) return;
+    // توكن جديد = جلسة شغّالة (لو كانت انتهت قبل، اللي بعدها بينعالج من جديد)
+    SessionEvents.reset();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accessTokenKey, accessToken);
     if (refreshToken != null && refreshToken.isNotEmpty) {

@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 
 class AuthApiService {
   // رابط السيرفر المرفق في ملف v1.json
+  static const _timeout = Duration(seconds: 60);
+
   static const String baseUrl = 'https://labaik-api.onrender.com/api/v1/auth';
 
   // 1. تسجيل حساب جديد
@@ -21,7 +23,7 @@ class AuthApiService {
         'email': email,
         'password': password,
       }),
-    );
+    ).timeout(_timeout);
   }
 
   // 2. تأكيد البريد بـ رمز التحقق (OTP)
@@ -37,7 +39,7 @@ class AuthApiService {
         'email': email,
         'code': code,
       }),
-    );
+    ).timeout(_timeout);
   }
 
   // 3. إعادة إرسال الرمز
@@ -47,7 +49,7 @@ class AuthApiService {
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email}),
-    );
+    ).timeout(_timeout);
   }
 
   // 4. تسجيل الدخول
@@ -63,7 +65,7 @@ class AuthApiService {
         'email': email,
         'password': password,
       }),
-    );
+    ).timeout(_timeout);
   }
 
   // 5. طلب استعادة كلمة المرور
@@ -73,7 +75,7 @@ class AuthApiService {
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email}),
-    );
+    ).timeout(_timeout);
   }
 
   // 6. تعيين كلمة مرور جديدة
@@ -91,7 +93,7 @@ class AuthApiService {
         'code': code,
         'newPassword': newPassword,
       }),
-    );
+    ).timeout(_timeout);
   }
 
   // 6.5 الدخول بـ Google: الـ ID token من google_sign_in → نفس رد /auth/login
@@ -101,7 +103,7 @@ class AuthApiService {
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'idToken': idToken}),
-    );
+    ).timeout(_timeout);
   }
 
   // 7. تحديث الـ Token
@@ -111,7 +113,7 @@ class AuthApiService {
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'refreshToken': refreshToken}),
-    );
+    ).timeout(_timeout);
   }
 
   // 7.5 تغيير كلمة المرور وأنا داخل (الحالية + الجديدة) — بيرجع توكنات جديدة (mustChangePassword: false)
@@ -121,7 +123,7 @@ class AuthApiService {
       url,
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
       body: jsonEncode({'currentPassword': currentPassword, 'newPassword': newPassword}),
-    );
+    ).timeout(_timeout);
   }
 
   // 7.6 تسجيل الخروج: إلغاء الـ refreshToken على السيرفر (ما بيحتاج accessToken)
@@ -153,6 +155,6 @@ class AuthApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
-    );
+    ).timeout(_timeout);
   }
 }

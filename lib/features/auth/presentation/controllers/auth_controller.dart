@@ -1,9 +1,17 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../../../../core/l10n/api_error_text.dart';
+import '../../../../core/network/session_events.dart';
 import '../../../../core/utils/app_preferences.dart';
 import '../../../../core/utils/token_storage.dart';
 import '../../../company/presentation/pages/company_shell.dart';
+import '../../../family/presentation/controllers/family_controller.dart';
+import '../../../group/data/sources/group_realtime.dart';
+import '../../../group/presentation/controllers/group_controller.dart';
 import '../../../supervisor/data/sources/supervisor_local_source.dart';
 import '../../../supervisor/presentation/pages/supervisor_shell.dart';
 import '../../../trip_details/data/models/trip_setup_mapper.dart';
@@ -159,7 +167,7 @@ class AuthController {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AuthMessagesText.errorPrefix()}$e')),
+        SnackBar(content: Text(_failure(e))),
       );
     }
   }
@@ -198,7 +206,7 @@ class AuthController {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AuthMessagesText.errorPrefix()}$e')),
+        SnackBar(content: Text(_failure(e))),
       );
     }
   }
@@ -214,6 +222,12 @@ class AuthController {
     required bool isPasswordReset,
     required Function(bool) setLoading,
   }) async {
+    // استعادة كلمة المرور: الرمز رمز استعادة (مش تأكيد بريد) — بيتحقق منه reset-password نفسه
+    // (كان بينبعت لـ verify-email فالسيرفر يرفضه دايماً وما حدا يقدر يغيّر كلمته)
+    if (isPasswordReset) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => CreateNewPasswordScreen(email: email, code: code)));
+      return;
+    }
     setLoading(true);
 
     try {
@@ -264,7 +278,7 @@ class AuthController {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AuthMessagesText.connectionErrorPrefix()}$e')),
+        SnackBar(content: Text(_failure(e))),
       );
     }
   }
@@ -282,7 +296,7 @@ class AuthController {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AuthMessagesText.resendFailedPrefix()}$e')),
+        SnackBar(content: Text(_failure(e))),
       );
     }
   }
@@ -318,7 +332,7 @@ class AuthController {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AuthMessagesText.errorPrefix()}$e')),
+        SnackBar(content: Text(_failure(e))),
       );
     }
   }
@@ -363,7 +377,7 @@ class AuthController {
     } catch (e) {
       setLoading(false);
       if (!context.mounted) return;
-      showMessage(context, '${AuthMessagesText.errorPrefix()}$e');
+      showMessage(context, _failure(e));
     }
   }
 
@@ -404,16 +418,48 @@ class AuthController {
           (route) => false,
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AuthMessagesText.resetFailed())),
-        );
+        // رمز غلط أو منتهي → نرجعه لشاشة الرمز يطلب جديد
+        final code = AuthApiService.errorCode(response.body);
+        final message = switch (code) {
+          'Otp.Invalid' => AuthMessagesText.invalidCode(),
+          'Otp.Expired' => AuthMessagesText.codeExpired(),
+          'Otp.TooManyAttempts' => AuthMessagesText.codeExpired(),
+          _ => response.statusCode == 422 || response.statusCode == 400 ? AuthMessagesText.weakOrInvalid() : AuthMessagesText.resetFailed(),
+        };
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        if (code != null && code.startsWith('Otp.')) Navigator.pop(context);
       }
     } catch (e) {
       setLoading(false);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AuthMessagesText.errorPrefix()}$e')),
+        SnackBar(content: Text(_failure(e))),
       );
     }
+  }
+
+  /// رسالة مفهومة بدل نص الخطأ التقني (بلا نت، مهلة، أو غيره)
+  static String _failure(Object e) => e is SocketException || e is TimeoutException || e is http.ClientException || e is HandshakeException ? ApiErrorText.offline() : ApiErrorText.failed();
+
+  /// الجلسة انتهت من السيرفر (SessionEvents): لازم يغيّر كلمة المرور → الشاشة الإجبارية
+  /// غير هيك (انلغت الجلسة، المشرف موقوف، الحساب معطّل، الشركة موقوفة) → شاشة الدخول مع السبب
+  static Future<void> onSessionEnded(String? code) async {
+    final navigator = SessionEvents.navigatorKey.currentState;
+    if (navigator == null) return SessionEvents.reset();
+    if (code == 'Auth.PasswordChangeRequired') {
+      navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const CreateNewPasswordScreen.change(forced: true)), (route) => false);
+      return;
+    }
+    await FamilyController.stopLocationSharing();
+    await GroupController.stopLocationSharing();
+    await TokenStorage.clearTokens();
+    await AuthSession.clear();
+    GroupRealtime.reset();
+    navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
+    final message = ApiErrorText.forCode(code) ?? ApiErrorText.sessionEnded;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = SessionEvents.navigatorKey.currentContext;
+      if (context != null) showMessage(context, message());
+    });
   }
 }

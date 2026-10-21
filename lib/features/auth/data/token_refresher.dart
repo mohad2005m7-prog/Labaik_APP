@@ -1,3 +1,4 @@
+import '../../../core/network/session_events.dart';
 import '../../../core/utils/token_storage.dart';
 import 'auth_api_service.dart';
 import 'auth_session.dart';
@@ -18,7 +19,11 @@ abstract final class TokenRefresher {
     if (refreshToken == null || refreshToken.isEmpty) return null;
     try {
       final response = await AuthApiService.refreshToken(refreshToken: refreshToken);
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        // السيرفر رفض التجديد: الجلسة انلغت (إيقاف المشرف بيلغيها) أو الحساب موقوف/معطّل أو الشركة موقوفة
+        if (response.statusCode == 401 || response.statusCode == 403) SessionEvents.report(AuthApiService.errorCode(response.body) ?? 'Auth.Unauthorized');
+        return null;
+      }
       final tokens = TokenStorage.extractTokens(response.body);
       await TokenStorage.saveTokens(accessToken: tokens['accessToken'], refreshToken: tokens['refreshToken']);
       // الأدوار بتتحدّث مع تجديد التوكن

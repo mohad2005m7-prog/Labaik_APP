@@ -10,6 +10,7 @@ import '../controllers/supervisor_controller.dart';
 import '../cubits/supervisor_content_cubits.dart';
 import '../cubits/supervisor_profile_cubit.dart';
 import '../l10n/sup_home_text.dart';
+import '../widgets/sup_list_status.dart';
 import '../widgets/supervisor_colors.dart';
 import '../widgets/supervisor_page.dart';
 import '../widgets/supervisor_widgets.dart';
@@ -53,7 +54,19 @@ class SupervisorHomeScreen extends StatelessWidget {
         BlocBuilder<SupervisorGroupsCubit, ListState<SupervisorGroup>>(
           builder: (context, state) {
             final group = state.items.isEmpty ? null : state.items.first;
-            if (group == null) return const SizedBox.shrink();
+            // قبل ما توصل المجموعة / فشل / لسا ما انضاف لمجموعة — بدل الفراغ تحت الصورة
+            if (group == null) {
+              return c.rect(
+                left: 16,
+                top: 395,
+                width: 361,
+                height: 200,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: SupListStatus(loaded: state.loaded, failed: state.failed, isEmpty: true, empty: SupListStatusText.noGroups, onRetry: context.read<SupervisorGroupsCubit>().load),
+                ),
+              );
+            }
             return Positioned.fill(child: Stack(clipBehavior: Clip.none, children: _groupSection(context, c, group)));
           },
         ),

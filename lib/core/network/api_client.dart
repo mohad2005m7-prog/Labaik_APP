@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'api_config.dart';
 import 'api_exception.dart';
+import 'session_events.dart';
 
 // -------------------------------------------------------------
 // ApiClient — طلبات JSON محمية لسيرفر لبيك:
@@ -64,7 +65,12 @@ class ApiClient {
           response = await request(_headers(renewed)).timeout(timeout);
         }
       }
-      if (response.statusCode < 200 || response.statusCode >= 300) throw ApiException(response.statusCode, _problemCode(response));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final code = _problemCode(response);
+        // الجلسة انتهت فعلاً (حتى بعد التجديد) أو لازم يغيّر كلمة المرور → التطبيق بيوجّهه (SessionEvents)
+        if (response.statusCode == 401 || code == 'Auth.PasswordChangeRequired') SessionEvents.report(code ?? 'Auth.Unauthorized');
+        throw ApiException(response.statusCode, code);
+      }
       final body = utf8.decode(response.bodyBytes);
       return body.trim().isEmpty ? null : jsonDecode(body);
     } on ApiException {
