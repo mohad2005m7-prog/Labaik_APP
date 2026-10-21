@@ -78,5 +78,14 @@ abstract final class CompanyFormsText {
   static const chooseGroup = Tx('اختر المجموعة', 'Choose a group');
   static const pickPilgrim = Tx('اختر معتمراً من معتمري الشركة', 'Choose one of your pilgrims');
   static const addByEmail = Tx('+ إضافة معتمر جديد بالإيميل', '+ Add a new pilgrim by email');
+  // تعديل وحذف الرحلة
+  static const editTrip = Tx('تعديل الرحلة', 'Edit trip');
+  static const saveTrip = Tx('حفظ التعديلات', 'Save changes');
+  static const tripSaved = Tx('تم حفظ الرحلة', 'Trip saved');
+  static const tripSaveFailed = Tx('تعذّر حفظ الرحلة', "Couldn't save the trip");
+  static const deleteTrip = Tx('حذف الرحلة', 'Delete trip');
+  static String deleteTripConfirm(Object name) => tr('حذف «$name» ومجموعاتها الفارغة؟ لا يمكن التراجع عن ذلك.', 'Delete "$name" and its empty groups? This cannot be undone.');
+  static const tripDeleted = Tx('تم حذف الرحلة', 'Trip deleted');
+  static const tripHasPilgrims = Tx('في مجموعات هذه الرحلة معتمرون، احذفهم من المجموعات أولاً', "This trip's groups have pilgrims, remove them first");
   static const noEmail = Tx('لا يوجد بريد إلكتروني لهذا المعتمر', 'This pilgrim has no email');
 }

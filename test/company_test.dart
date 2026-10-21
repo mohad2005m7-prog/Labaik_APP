@@ -86,6 +86,24 @@ class FakeCompany implements CompanyRepository {
         CompanyTrip(id: '3', title: 'رحلة الحج الثالثة', destinations: 'مكة المكرمة', dates: '15 ديسمبر 2026', status: CompanyTripStatus.upcoming),
       ];
 
+  final deletedTrips = <String>[];
+  final updatedTrips = <String, TripDraft>{};
+
+  @override
+  Future<TripDraft> tripDraft(String tripId) async => TripDraft(kind: PilgrimageKind.umrah, name: 'رحلة العمرة الأولى', destinations: const ['مكة المكرمة'], departureDate: DateTime(2026, 11, 20), departurePlace: 'عمّان', expectedPilgrims: 40);
+
+  @override
+  Future<CompanyTrip> updateTrip(String tripId, TripDraft draft) async {
+    updatedTrips[tripId] = draft;
+    return CompanyTrip(id: tripId, title: draft.name, destinations: draft.destinations.join('، '), dates: '', status: CompanyTripStatus.upcoming);
+  }
+
+  @override
+  Future<void> deleteTrip(String tripId) async {
+    if (groupsList.any((g) => g.tripId == tripId && g.memberCount > 0)) throw const ApiException(409, 'Trip.HasPilgrims');
+    deletedTrips.add(tripId);
+  }
+
   @override
   Future<CompanyTrip> createTrip(TripDraft draft) async {
     createdTrips.add(draft);
@@ -671,5 +689,50 @@ void main() {
     await tester.pumpAndSettle();
     expect(repo.deletedGroups, [group.id]);
     expect(find.byType(CompanyGroupDetailScreen), findsNothing);
+  });
+
+  testWidgets('trip details: edit opens the form filled from the server and saves; delete refused with pilgrims then allowed', (tester) async {
+    tester.view.physicalSize = const Size(393 * 3, 852 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final repo = FakeCompany();
+    final trip = (await repo.trips()).first;
+    await repo.createGroup(tripId: trip.id, name: 'مجموعة أ');
+    repo.groupsList[0] = repo.groupsList[0].copyWith(memberCount: 3);
+    await tester.pumpWidget(MaterialApp(
+      builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+      home: Builder(builder: (context) => TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CompanyTripDetailsScreen(trip: trip, repository: repo))), child: const Text('open'))),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    Finder text(String v) => find.text(v, findRichText: true);
+
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+    expect(find.byType(CompanyCreateTripScreen), findsOneWidget);
+    expect(find.text('عمّان'), findsOneWidget); // معبّى من السيرفر
+    await tester.enterText(find.widgetWithText(TextField, 'رحلة العمرة الأولى'), 'عمرة نوفمبر');
+    await tester.ensureVisible(text('حفظ التعديلات'));
+    await tester.tap(text('حفظ التعديلات'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(repo.updatedTrips[trip.id]?.name, 'عمرة نوفمبر');
+    expect(find.byType(CompanyCreateTripScreen), findsNothing);
+
+    await tester.ensureVisible(text('حذف الرحلة').first);
+    await tester.tap(text('حذف الرحلة').first, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'حذف الرحلة'));
+    await tester.pumpAndSettle();
+    expect(find.text('في مجموعات هذه الرحلة معتمرون، احذفهم من المجموعات أولاً'), findsOneWidget);
+    expect(repo.deletedTrips, isEmpty);
+
+    repo.groupsList[0] = repo.groupsList[0].copyWith(memberCount: 0);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.tap(text('حذف الرحلة').first, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'حذف الرحلة'));
+    await tester.pumpAndSettle();
+    expect(repo.deletedTrips, [trip.id]);
+    expect(find.byType(CompanyTripDetailsScreen), findsNothing);
   });
 }

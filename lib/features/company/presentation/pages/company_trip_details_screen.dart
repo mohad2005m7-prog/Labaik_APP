@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/figma_text.dart';
 import '../../../../core/utils/figma_canvas.dart';
 import '../../../../core/widgets/figma_lines.dart';
@@ -14,10 +15,12 @@ import '../controllers/company_controller.dart';
 import '../l10n/company_forms_text.dart';
 import '../l10n/company_groups_text.dart';
 import '../l10n/company_trips_text.dart';
+import '../../../supervisor/presentation/widgets/supervisor_colors.dart';
 import '../widgets/company_box.dart';
 import '../widgets/company_colors.dart';
 import '../widgets/company_group_card.dart';
 import 'company_create_group_screen.dart';
+import 'company_create_trip_screen.dart';
 import 'company_group_detail_screen.dart';
 import 'company_supervisors_screen.dart';
 
@@ -41,6 +44,7 @@ class CompanyTripDetailsScreen extends StatefulWidget {
 class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
   static const _groupsTop = 443.0;
 
+  late CompanyTrip _trip = widget.trip;
   List<CompanyGroup>? _groups;
   bool _failed = false;
   bool _changed = false;
@@ -55,14 +59,14 @@ class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
     setState(() => _failed = false);
     try {
       final all = await widget.repository.groups();
-      if (mounted) setState(() => _groups = [for (final g in all) if (g.tripId == widget.trip.id) g]);
+      if (mounted) setState(() => _groups = [for (final g in all) if (g.tripId == _trip.id) g]);
     } catch (_) {
       if (mounted) setState(() => _failed = true);
     }
   }
 
   Future<void> _openGroup(CompanyGroup g) async {
-    final changed = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyGroupDetailScreen(group: g, repository: widget.repository, trip: widget.trip)));
+    final changed = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyGroupDetailScreen(group: g, repository: widget.repository, trip: _trip)));
     if (changed == true && mounted) {
       _changed = true;
       _load();
@@ -72,15 +76,63 @@ class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
   Future<void> _createGroup() async {
     final roster = await widget.repository.supervisors().catchError((_) => <CompanySupervisor>[]);
     if (!mounted) return;
-    final created = await Navigator.push<CompanyGroup>(context, MaterialPageRoute(builder: (_) => CompanyCreateGroupScreen(repository: widget.repository, trips: [widget.trip], supervisors: roster)));
+    final created = await Navigator.push<CompanyGroup>(context, MaterialPageRoute(builder: (_) => CompanyCreateGroupScreen(repository: widget.repository, trips: [_trip], supervisors: roster)));
     if (created != null && mounted) {
       _changed = true;
       _load();
     }
   }
 
+  /// القلم → تعديل الرحلة (نفس شاشة الإنشاء بحقولها من السيرفر)
+  Future<void> _edit() async {
+    final TripDraft draft;
+    try {
+      draft = await widget.repository.tripDraft(_trip.id);
+    } catch (e) {
+      if (mounted) CompanyController.showError(context, e);
+      return;
+    }
+    if (!mounted) return;
+    final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => CompanyCreateTripScreen(repository: widget.repository, tripId: _trip.id, initial: draft)));
+    if (saved != true || !mounted) return;
+    _changed = true;
+    try {
+      final fresh = (await widget.repository.trips()).where((t) => t.id == _trip.id).firstOrNull;
+      if (fresh != null && mounted) setState(() => _trip = fresh);
+    } catch (_) {}
+    _load();
+  }
+
+  /// "حذف الرحلة" (بتأكيد) — السيرفر بيرفض لو في مجموعة فيها معتمرين
+  Future<void> _delete() async {
+    final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            content: Text(CompanyFormsText.deleteTripConfirm(_trip.title), style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 15)),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(CompanyGroupsText.cancel())),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(CompanyFormsText.deleteTrip(), style: const TextStyle(color: SupColors.red, fontWeight: FontWeight.bold))),
+            ],
+          ),
+        ) ??
+        false;
+    if (!ok || !mounted) return;
+    try {
+      await widget.repository.deleteTrip(_trip.id);
+      if (!mounted) return;
+      CompanyController.showMessage(context, CompanyFormsText.tripDeleted());
+      Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.statusCode == 409) return CompanyController.showMessage(context, CompanyFormsText.tripHasPilgrims());
+      CompanyController.showError(context, e);
+    } catch (e) {
+      if (mounted) CompanyController.showError(context, e);
+    }
+  }
+
   Future<void> _openPilgrims() async {
-    if (await CompanyController.openPilgrims(context, widget.repository, trip: widget.trip) && mounted) {
+    if (await CompanyController.openPilgrims(context, widget.repository, trip: _trip) && mounted) {
       _changed = true;
       _load();
     }
@@ -96,7 +148,7 @@ class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final trip = widget.trip;
+    final trip = _trip;
     final groups = _groups ?? const <CompanyGroup>[];
     final pilgrims = groups.fold<int>(0, (n, g) => n + g.memberCount);
     final supervisors = {for (final g in groups) ?g.supervisorName}.length;
@@ -112,7 +164,7 @@ class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
         title: CompanyTripsText.detailsTitle(),
         titleRight: 349,
         chevronLeft: 367,
-        frameHeight: math.max(852, buttonTop + 50 + 40),
+        frameHeight: math.max(852, buttonTop + 66 + 44 + 40),
         body: (c) => [
           // كرت الرحلة
           companyBox(c, left: 16, top: 117, width: 361, height: 158, radius: 12, color: CompanyColors.card, shadow: CompanyColors.shadow),
@@ -141,6 +193,21 @@ class _CompanyTripDetailsScreenState extends State<CompanyTripDetailsScreen> {
             c.text(CompanyGroupsText.empty(), left: 16, top: _groupsTop + 8, width: 361, height: 22, align: TextAlign.center, dy: 0, style: c.style(14, FigmaWeight.sfRegular, const Color(0xFF717171), lineHeight: null, letterSpacing: 0)),
           for (final (i, g) in groups.indexed) ...CompanyGroupCard.build(c, g, top: _groupsTop + i * CompanyGroupCard.pitch, onTap: () => _openGroup(g)),
           c.button(CompanyGroupsText.createGroup(), left: 16, top: buttonTop, figmaSpacing: true, onTap: _createGroup),
+          // حذف الرحلة (تحت إنشاء مجموعة)
+          c.rect(
+            left: 16,
+            top: buttonTop + 66,
+            width: 361,
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: _delete,
+              style: OutlinedButton.styleFrom(foregroundColor: SupColors.red, side: BorderSide(color: SupColors.red.withValues(alpha: 0.5)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(c.s.x(10)))),
+              icon: Icon(Icons.delete_outline_rounded, size: c.s.x(20)),
+              label: Text(CompanyFormsText.deleteTrip(), style: c.style(14, FigmaWeight.semiBold, SupColors.red, lineHeight: null, letterSpacing: 0)),
+            ),
+          ),
+          // القلم: تعديل الرحلة
+          c.rect(left: 16, top: 61, width: 40, height: 40, child: IconButton(padding: EdgeInsets.zero, tooltip: CompanyFormsText.editTrip(), onPressed: _edit, icon: Icon(Icons.edit_outlined, size: c.s.x(22), color: green))),
         ],
       ),
     );

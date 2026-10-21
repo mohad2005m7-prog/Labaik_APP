@@ -7,6 +7,7 @@ import '../../../../core/utils/figma_canvas.dart';
 import '../../../../core/widgets/figma_page.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/utils/latin_digits.dart';
 import '../../../supervisor/presentation/widgets/supervisor_format.dart';
 import '../../domain/entities/company_trip.dart';
 import '../../domain/repositories/company_repository.dart';
@@ -25,7 +26,13 @@ import '../widgets/company_colors.dart';
 class CompanyCreateTripScreen extends StatefulWidget {
   final CompanyRepository repository;
 
-  const CompanyCreateTripScreen({super.key, required this.repository});
+  /// تعديل رحلة موجودة: رقمها وحقولها (null = إنشاء رحلة جديدة)
+  final String? tripId;
+  final TripDraft? initial;
+
+  const CompanyCreateTripScreen({super.key, required this.repository, this.tripId, this.initial});
+
+  bool get isEdit => tripId != null;
 
   /// "مكة المكرمة، المدينة المنورة" أو بفاصلة إنجليزية → قائمة
   static List<String> splitDestinations(String text) => [
@@ -47,6 +54,21 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
   final _departurePoint = TextEditingController();
   final _notes = TextEditingController();
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final d = widget.initial;
+    if (d == null) return;
+    _tripTypeIndex = d.kind == PilgrimageKind.hajj ? 1 : 0;
+    _name.text = d.name;
+    _destinations.text = d.destinations.join('، ');
+    _departureDate = d.departureDate;
+    _returnDate = d.returnDate;
+    _pilgrims.text = d.expectedPilgrims > 0 ? '${d.expectedPilgrims}' : '';
+    _departurePoint.text = d.departurePlace;
+    _notes.text = d.notes ?? '';
+  }
 
   @override
   void dispose() {
@@ -98,7 +120,9 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
   Future<void> _pickDate(bool departure) async {
     final now = DateTime.now();
     final initial = departure ? (_departureDate ?? now.add(const Duration(days: 30))) : (_returnDate ?? (_departureDate ?? now).add(const Duration(days: 14)));
-    final picked = await showDatePicker(context: context, initialDate: initial, firstDate: now, lastDate: DateTime(now.year + 5));
+    // بالتعديل ممكن الرحلة طلعت قبل اليوم — أول تاريخ مسموح = الأقدم منهم
+    final first = initial.isBefore(now) ? initial : now;
+    final picked = await showDatePicker(context: context, initialDate: initial, firstDate: DateTime(first.year, first.month, first.day), lastDate: DateTime(now.year + 5));
     if (picked != null && mounted) {
       setState(() {
         if (departure) {
@@ -114,7 +138,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
     FocusScope.of(context).unfocus();
     if (_busy) return;
     final destinations = CompanyCreateTripScreen.splitDestinations(_destinations.text);
-    final count = int.tryParse(_pilgrims.text.trim()) ?? 0;
+    final count = int.tryParse(latinDigits(_pilgrims.text.trim())) ?? 0;
     final departure = _departureDate;
     if (_name.text.trim().isEmpty || destinations.isEmpty || departure == null || _departurePoint.text.trim().isEmpty || count <= 0) {
       return CompanyController.showMessage(context, CompanyFormsText.tripMissing());
@@ -124,8 +148,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
     }
     setState(() => _busy = true);
     try {
-      await widget.repository.createTrip(
-        TripDraft(
+      final draft = TripDraft(
           kind: _tripTypeIndex == 1 ? PilgrimageKind.hajj : PilgrimageKind.umrah,
           name: _name.text,
           destinations: destinations,
@@ -134,8 +157,16 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
           departurePlace: _departurePoint.text,
           expectedPilgrims: count,
           notes: _notes.text,
-        ),
-      );
+        );
+      if (widget.isEdit) {
+        await widget.repository.updateTrip(widget.tripId!, draft);
+        if (!mounted) return;
+        setState(() => _busy = false);
+        CompanyController.showMessage(context, CompanyFormsText.tripSaved());
+        Navigator.of(context).pop(true);
+        return;
+      }
+      await widget.repository.createTrip(draft);
       if (!mounted) return;
       setState(() => _busy = false);
       _showSuccess();
@@ -143,7 +174,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
       if (!mounted) return;
       setState(() => _busy = false);
       final message = e is ApiException && (e.statusCode == 400 || e.statusCode == 422) ? CompanyFormsText.invalidData() : ApiErrorText.of(e)();
-      CompanyController.showMessage(context, '${CompanyFormsText.tripCreateFailed()} — $message');
+      CompanyController.showMessage(context, '${widget.isEdit ? CompanyFormsText.tripSaveFailed() : CompanyFormsText.tripCreateFailed()} — $message');
     }
   }
 
@@ -173,7 +204,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
   Widget build(BuildContext context) {
     final types = [CompanyCreateTripText.typeUmrah(), CompanyCreateTripText.typeHajj()];
     return FigmaPage(
-      title: CompanyCreateTripText.title(),
+      title: widget.isEdit ? CompanyFormsText.editTrip() : CompanyCreateTripText.title(),
       titleRight: 349,
       chevronLeft: 367,
       frameHeight: 1046,
@@ -235,7 +266,7 @@ class _CompanyCreateTripScreenState extends State<CompanyCreateTripScreen> {
           label(CompanyCreateTripText.notesLabel(), 834),
           textField(_notes, CompanyCreateTripText.notesHint(), 864, multiline: true),
           // زر "إنشاء الرحلة"
-          c.button(CompanyCreateTripText.createButton(), left: 16, top: 962, figmaSpacing: true, onTap: _submit),
+          c.button(widget.isEdit ? CompanyFormsText.saveTrip() : CompanyCreateTripText.createButton(), left: 16, top: 962, figmaSpacing: true, onTap: _submit),
           if (_busy) c.rect(left: 16, top: 962, width: 361, height: 50, child: const _Busy()),
         ];
       },

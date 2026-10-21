@@ -63,6 +63,15 @@ class CompanyRepositoryImpl implements CompanyRepository {
   Future<CompanyTrip> createTrip(TripDraft draft) async => CompanyJson.trip(await _api.createTrip(CompanyJson.tripBody(draft)));
 
   @override
+  Future<TripDraft> tripDraft(String tripId) async => CompanyJson.draft(await _api.trip(tripId));
+
+  @override
+  Future<CompanyTrip> updateTrip(String tripId, TripDraft draft) async => CompanyJson.trip(await _api.updateTrip(tripId, CompanyJson.tripBody(draft)));
+
+  @override
+  Future<void> deleteTrip(String tripId) => _api.deleteTrip(tripId);
+
+  @override
   Future<List<CompanyNotification>> notifications() async => [for (final j in await _api.notifications()) ?CompanyJson.notification(j)];
 
   @override

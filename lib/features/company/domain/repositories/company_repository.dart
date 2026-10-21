@@ -25,6 +25,15 @@ abstract class CompanyRepository {
 
   Future<CompanyTrip> createTrip(TripDraft draft);
 
+  /// كل حقول الرحلة للتعديل (GET /company/trips/{id})
+  Future<TripDraft> tripDraft(String tripId);
+
+  /// تعديل الرحلة (PUT — كل الحقول)
+  Future<CompanyTrip> updateTrip(String tripId, TripDraft draft);
+
+  /// حذف الرحلة مع مجموعاتها الفاضية (409 Trip.HasPilgrims لو في مجموعة فيها معتمرين)
+  Future<void> deleteTrip(String tripId);
+
   /// من الأحدث للأقدم
   Future<List<CompanyNotification>> notifications();
 

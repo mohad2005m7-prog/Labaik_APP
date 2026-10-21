@@ -47,6 +47,10 @@ class CompanyApi {
 
   Future<Map<String, dynamic>> createTrip(Map<String, dynamic> body) async => _map(await _client.postJson('/company/trips', body: body));
 
+  Future<Map<String, dynamic>> updateTrip(String id, Map<String, dynamic> body) async => _map(await _client.putJson('/company/trips/$id', body: body));
+
+  Future<void> deleteTrip(String id) => _client.delete('/company/trips/$id');
+
   Future<List<Map<String, dynamic>>> allGroups() async => _list(await _client.getJson('/company/groups'));
 
   Future<List<Map<String, dynamic>>> tripGroups(String tripId) async => _list(await _client.getJson('/company/trips/$tripId/groups'));

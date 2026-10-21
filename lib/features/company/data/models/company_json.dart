@@ -56,6 +56,18 @@ abstract final class CompanyJson {
 
   static List<String> destinationsOf(Map<String, dynamic> j) => [for (final d in (j.field('destinations') as List?) ?? const []) d.toString()];
 
+  /// TripDto (التفاصيل) → حقول التعديل
+  static TripDraft draft(Map<String, dynamic> j) => TripDraft(
+        kind: j.optionalInt('pilgrimageType') == 2 ? PilgrimageKind.hajj : PilgrimageKind.umrah,
+        name: _str(j, 'name'),
+        destinations: destinationsOf(j),
+        departureDate: _date(j, 'departureDate') ?? DateTime.now(),
+        returnDate: _date(j, 'returnDate'),
+        departurePlace: _str(j, 'departurePlace'),
+        expectedPilgrims: j.optionalInt('expectedPilgrims') ?? 0,
+        notes: _opt(j, 'notes'),
+      );
+
   static Map<String, dynamic> tripBody(TripDraft d) => {
         'name': d.name.trim(),
         'pilgrimageType': d.kind == PilgrimageKind.hajj ? 2 : 1,
