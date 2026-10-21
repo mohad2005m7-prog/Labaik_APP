@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../data/sources/chat_pins.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/conversation_summary.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -49,7 +50,14 @@ class ChatsListCubit extends Cubit<ChatsListState> {
   final ChatRepository _repository;
   final Duration pollInterval;
 
-  ChatsListCubit(this._repository, {this.pollInterval = const Duration(seconds: 15)}) : super(const ChatsListState());
+  ChatsListCubit(this._repository, {this.pollInterval = const Duration(seconds: 15), ChatPins? pins}) : _pins = pins ?? ChatPins(), super(const ChatsListState());
+
+  final ChatPins _pins;
+
+  /// اختيار المستخدم للتثبيت (فوق الافتراضي)
+  Map<String, bool> _pinned = {};
+
+  List<ConversationSummary> _withPins(List<ConversationSummary> list) => [for (final c in list) _pinned.containsKey(c.id) ? c.copyWith(isPinned: _pinned[c.id]) : c];
 
   StreamSubscription<ChatMessage>? _live;
   Timer? _poll;
@@ -59,9 +67,10 @@ class ChatsListCubit extends Cubit<ChatsListState> {
   String? _openId;
 
   Future<void> start() async {
+    _pinned = await _pins.load();
     final cached = await _repository.cachedConversations();
     if (isClosed) return;
-    if (cached.isNotEmpty) emit(state.copyWith(all: cached));
+    if (cached.isNotEmpty) emit(state.copyWith(all: _withPins(cached)));
     _live = _repository.incoming().listen(_onMessage, onError: (_) {});
     await refresh();
     if (isClosed) return;
@@ -75,7 +84,7 @@ class ChatsListCubit extends Cubit<ChatsListState> {
     _fetching = true;
     try {
       final list = await _repository.conversations();
-      if (!isClosed) emit(state.copyWith(all: list, loading: false, clearError: true));
+      if (!isClosed) emit(state.copyWith(all: _withPins(list), loading: false, clearError: true));
     } catch (error) {
       if (!isClosed) emit(state.copyWith(loading: false, error: error));
     } finally {
@@ -104,6 +113,22 @@ class ChatsListCubit extends Cubit<ChatsListState> {
     _openId = conversationId;
     final list = [for (final c in state.all) c.id == conversationId ? c.copyWith(unreadCount: 0) : c];
     emit(state.copyWith(all: list));
+  }
+
+  /// الضغط المطوّل: تثبيت / إلغاء التثبيت (بينحفظ على الجهاز)
+  Future<void> togglePin(ConversationSummary conversation) async {
+    final pinned = !conversation.isPinned;
+    _pinned[conversation.id] = pinned;
+    emit(state.copyWith(all: [for (final c in state.all) c.id == conversation.id ? c.copyWith(isPinned: pinned) : c]));
+    await _pins.set(conversation.id, pinned);
+  }
+
+  /// الضغط المطوّل: تعليم كمقروءة (بالسيرفر كمان)
+  Future<void> markRead(ConversationSummary conversation) async {
+    emit(state.copyWith(all: [for (final c in state.all) c.id == conversation.id ? c.copyWith(unreadCount: 0) : c]));
+    try {
+      await _repository.markRead(conversation.id);
+    } catch (_) {}
   }
 
   /// الرجوع من المحادثة → آخر رسالة من السيرفر

@@ -181,6 +181,48 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  test('chats list: unpin/pin is remembered on the device, mark read clears the badge and tells the server', () async {
+    final now = DateTime.now();
+    final repo = FakeChat()
+      ..list = [
+        ConversationSummary(id: 'g1', title: 'طول بالك', isGroup: true, isPinned: true, unreadCount: 3, lastMessage: message('a', 'مرحبا', now)),
+        ConversationSummary(id: 'c1', title: 'أبو أحمد', lastMessage: message('b', 'أهلاً', now.subtract(const Duration(hours: 1)))),
+      ];
+    final cubit = ChatsListCubit(repo, pollInterval: const Duration(hours: 1));
+    await cubit.start();
+    await cubit.togglePin(cubit.state.all.first);
+    expect(cubit.state.visible.first.isPinned, isFalse);
+    await cubit.markRead(cubit.state.all.firstWhere((c) => c.id == 'g1'));
+    expect(cubit.state.all.firstWhere((c) => c.id == 'g1').unreadCount, 0);
+    expect(repo.read, ['g1']);
+    await cubit.close();
+    // بعد إعادة الفتح: الاختيار محفوظ
+    final again = ChatsListCubit(repo, pollInterval: const Duration(hours: 1));
+    await again.start();
+    expect(again.state.all.firstWhere((c) => c.id == 'g1').isPinned, isFalse);
+    await again.close();
+  });
+
+  testWidgets('group conversation shows the sender name above the first bubble of each run', (tester) async {
+    tester.view.physicalSize = const Size(393 * 3, 852 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final now = DateTime.now();
+    final repo = FakeChat()
+      ..roomValue = const ChatRoom(isGroup: true)
+      ..server = [
+        ChatMessage(id: 'm1', clientId: 'm1', conversationId: 'g1', fromMe: false, senderName: 'سارة', text: 'السلام عليكم', sentAt: now),
+        ChatMessage(id: 'm2', clientId: 'm2', conversationId: 'g1', fromMe: false, senderName: 'سارة', text: 'وصلت', sentAt: now.add(const Duration(seconds: 5))),
+        ChatMessage(id: 'm3', clientId: 'm3', conversationId: 'g1', fromMe: false, senderName: 'أبو أحمد', text: 'تمام', sentAt: now.add(const Duration(seconds: 9))),
+      ];
+    await tester.pumpWidget(MaterialApp(home: BlocProvider(create: (_) => ConversationCubit(repo, 'g1', pollInterval: const Duration(hours: 1))..start(), child: const ConversationScreen(title: 'طول بالك', isGroup: true))));
+    await tester.pumpAndSettle();
+    expect(find.text('السلام عليكم', findRichText: true), findsOneWidget);
+    expect(find.text('سارة'), findsOneWidget);
+    expect(find.text('أبو أحمد'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   test('chats list: pinned first then newest, search, live message updates the row and unread count', () async {
     final now = DateTime.now();
     final repo = FakeChat()

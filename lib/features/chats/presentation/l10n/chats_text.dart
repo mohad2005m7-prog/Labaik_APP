@@ -9,5 +9,9 @@ abstract final class ChatsText {
   static const empty = Tx('لا توجد محادثات بعد', 'No chats yet');
   static const noResults = Tx('لا توجد نتائج', 'No results');
   static const location = Tx('📍 موقع', '📍 Location');
+  // الضغط المطوّل على محادثة
+  static const pin = Tx('تثبيت المحادثة', 'Pin chat');
+  static const unpin = Tx('إلغاء التثبيت', 'Unpin chat');
+  static const markRead = Tx('تعليم كمقروءة', 'Mark as read');
   static const mapFailed = Tx('تعذّر فتح الخريطة', "Couldn't open the map");
 }

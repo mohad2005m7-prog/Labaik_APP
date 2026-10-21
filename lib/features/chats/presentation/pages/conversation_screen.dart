@@ -109,6 +109,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         onRetry: _cubit.retry,
                         onOpenLocation: (message) => ChatsController.openLocation(context, message),
                         onLongPress: (message) => _actions(message, state),
+                        showSenderNames: widget.isGroup,
                       );
                     },
                   ),

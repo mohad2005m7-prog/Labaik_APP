@@ -53,6 +53,36 @@ class ChatsController {
     if (!list.isClosed) list.closed();
   }
 
+  /// الضغط المطوّل على صف بقائمة المحادثات: تثبيت/إلغاء التثبيت، وتعليم كمقروءة
+  static Future<void> conversationOptions(BuildContext context, ConversationSummary conversation) async {
+    final list = context.read<ChatsListCubit>();
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin, color: const Color(0xFF1F3B2E)),
+              title: Text(conversation.isPinned ? ChatsText.unpin() : ChatsText.pin(), style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 15)),
+              onTap: () => Navigator.pop(ctx, 'pin'),
+            ),
+            if (conversation.unreadCount > 0)
+              ListTile(
+                leading: const Icon(Icons.mark_chat_read_outlined, color: Color(0xFF1F3B2E)),
+                title: Text(ChatsText.markRead(), style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 15)),
+                onTap: () => Navigator.pop(ctx, 'read'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == 'pin') await list.togglePin(conversation);
+    if (choice == 'read') await list.markRead(conversation);
+  }
+
   /// فتح محادثة من أي مكان (قائمة دردشات المشرف، دردشة مجموعة الشركة قراءة بس) — [repository] null = السيرفر
   static Future<void> openRoom(BuildContext context, {required String id, required String title, bool isGroup = false, String? photoUrl, ChatRepository? repository}) {
     return Navigator.push(

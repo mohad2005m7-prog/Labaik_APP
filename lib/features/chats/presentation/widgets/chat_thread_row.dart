@@ -21,8 +21,9 @@ class ChatThreadRow extends StatelessWidget {
   final ConversationSummary conversation;
   final String time;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
-  const ChatThreadRow({super.key, required this.c, required this.conversation, required this.time, required this.onTap});
+  const ChatThreadRow({super.key, required this.c, required this.conversation, required this.time, required this.onTap, this.onLongPress});
 
   static const height = 76.0;
   static const pitch = 82.0;
@@ -91,7 +92,7 @@ class ChatThreadRow extends StatelessWidget {
             ),
           ),
         c.box(left: 45, top: height - 0.25, width: 259, height: 0.5, color: ChatsColors.separator),
-        c.tapArea(left: 16, top: 0, width: 361, height: height, onTap: onTap),
+        c.rect(left: 16, top: 0, width: 361, height: height, child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, onLongPress: onLongPress)),
       ],
     );
   }

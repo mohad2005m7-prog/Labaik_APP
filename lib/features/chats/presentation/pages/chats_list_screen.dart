@@ -109,7 +109,13 @@ class ChatsListScreen extends StatelessWidget {
       physics: const ClampingScrollPhysics(),
       itemCount: chats.length,
       itemExtent: s.y(ChatThreadRow.pitch),
-      itemBuilder: (context, i) => ChatThreadRow(c: row, conversation: chats[i], time: ChatListTime.format(chats[i].updatedAt), onTap: () => ChatsController.openConversation(context, chats[i])),
+      itemBuilder: (context, i) => ChatThreadRow(
+        c: row,
+        conversation: chats[i],
+        time: ChatListTime.format(chats[i].updatedAt),
+        onTap: () => ChatsController.openConversation(context, chats[i]),
+        onLongPress: () => ChatsController.conversationOptions(context, chats[i]),
+      ),
     );
   }
 }

@@ -21,8 +21,8 @@ class ConversationSummary extends Equatable {
 
   DateTime? get updatedAt => lastMessage?.sentAt;
 
-  ConversationSummary copyWith({int? unreadCount, ChatMessage? lastMessage}) =>
-      ConversationSummary(id: id, title: title, photoUrl: photoUrl, isGroup: isGroup, isPinned: isPinned, unreadCount: unreadCount ?? this.unreadCount, lastMessage: lastMessage ?? this.lastMessage, otherUserId: otherUserId);
+  ConversationSummary copyWith({int? unreadCount, ChatMessage? lastMessage, bool? isPinned}) =>
+      ConversationSummary(id: id, title: title, photoUrl: photoUrl, isGroup: isGroup, isPinned: isPinned ?? this.isPinned, unreadCount: unreadCount ?? this.unreadCount, lastMessage: lastMessage ?? this.lastMessage, otherUserId: otherUserId);
 
   @override
   List<Object?> get props => [id, title, photoUrl, isGroup, isPinned, unreadCount, lastMessage, otherUserId];

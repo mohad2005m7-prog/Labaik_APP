@@ -8,6 +8,7 @@ import 'chat_avatar.dart';
 import 'chat_bubble.dart';
 import 'chat_location_content.dart';
 import 'chat_time_label.dart';
+import 'chats_colors.dart';
 
 // -------------------------------------------------------------
 // رسائل المحادثة (Figma 111:7045): فاصل الوقت فوق ("Yesterday 9:41" — y125)، بعده الفقاعات
@@ -40,6 +41,9 @@ class ChatMessageList extends StatelessWidget {
   /// الضغط المطوّل على فقاعة (حذف / كتم) — null = ما في
   final ValueChanged<ChatMessage>? onLongPress;
 
+  /// المجموعة: اسم صاحب الرسالة فوق أول فقاعة من سلسلة رسايله
+  final bool showSenderNames;
+
   const ChatMessageList({
     super.key,
     required this.s,
@@ -55,6 +59,7 @@ class ChatMessageList extends StatelessWidget {
     this.myPhoto,
     this.otherPhotoUrl,
     this.onLongPress,
+    this.showSenderNames = false,
   });
 
   static bool _sameSender(ChatMessage a, ChatMessage b) => a.fromMe == b.fromMe && (a.fromMe || a.senderName == b.senderName);
@@ -89,6 +94,9 @@ class ChatMessageList extends StatelessWidget {
       }
       // الصورة على آخر رسالة من السلسلة
       final last = next == null || !_sameSender(message, next) || _newTime(message, next);
+      final first = previous == null || !_sameSender(previous, message) || _newTime(previous, message);
+      final name = message.senderName;
+      if (showSenderNames && first && !message.fromMe && name != null) items.add(_senderName(name));
       items.add(_bubble(message, showAvatar: last));
     }
     return ListView(
@@ -97,6 +105,15 @@ class ChatMessageList extends StatelessWidget {
       children: items,
     );
   }
+
+  // اسم المرسل بطرف الفقاعات الواصلة (يسار — بعد مكان الصورة)
+  Widget _senderName(String name) => Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: EdgeInsets.only(left: s.x(ChatBubbleLayout.incoming.avatarInset + ChatBubbleLayout.avatarSize + ChatBubbleLayout.incoming.gap + 8), bottom: s.y(3)),
+          child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: figmaText(s, size: 12, weight: FigmaWeight.semiBold, color: ChatsColors.green, lineHeight: null, letterSpacing: 0)),
+        ),
+      );
 
   Widget _bubble(ChatMessage message, {required bool showAvatar}) {
     final failed = message.status == ChatMessageStatus.failed;
