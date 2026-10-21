@@ -79,7 +79,7 @@ void main() {
     expect((screen.email, screen.code, screen.isChange, loading), ('sup@x.test', '123456', false, false));
   });
 
-  test('session ended: a 401 after refresh and 403 Auth.PasswordChangeRequired reach the handler once', () async {
+  test('session ended: 401 after refresh, 403 Auth.PasswordChangeRequired and account blocks reach the handler once', () async {
     final codes = <String?>[];
     SessionEvents.handler = codes.add;
     addTearDown(() {
@@ -101,5 +101,12 @@ void main() {
     SessionEvents.reset();
     await expectLater(client(403, 'Company.ServiceDisabled').getJson('/chats'), throwsA(isA<ApiException>()));
     expect(codes, hasLength(2)); // خدمة مقفلة مش انتهاء جلسة
+    // الحساب انوقف وهو داخل (السيرفر بيرفض التوكن الحالي فوراً) → خروج برسالة السبب
+    for (final code in ['Supervisor.Suspended', 'Company.Stopped', 'Company.Expired', 'Auth.AccountDisabled']) {
+      SessionEvents.reset();
+      await expectLater(client(403, code).getJson('/supervisor/groups'), throwsA(isA<ApiException>()));
+      expect(codes.last, code);
+    }
+    expect(codes, hasLength(6));
   });
 }

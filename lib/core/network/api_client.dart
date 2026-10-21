@@ -56,6 +56,9 @@ class ApiClient {
     });
   }
 
+  /// أكواد السيرفر اللي معناها إنه الحساب نفسه ما عاد يقدر يستخدم التطبيق (بترجع على أي طلب، مش بس الدخول)
+  static const _sessionCodes = {'Auth.PasswordChangeRequired', 'Auth.AccountDisabled', 'Supervisor.Suspended', 'Company.Stopped', 'Company.Expired'};
+
   Future<Object?> _send(Future<http.Response> Function(Map<String, String> headers) request) async {
     try {
       var response = await request(_headers(await accessToken())).timeout(timeout);
@@ -67,8 +70,9 @@ class ApiClient {
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final code = _problemCode(response);
-        // الجلسة انتهت فعلاً (حتى بعد التجديد) أو لازم يغيّر كلمة المرور → التطبيق بيوجّهه (SessionEvents)
-        if (response.statusCode == 401 || code == 'Auth.PasswordChangeRequired') SessionEvents.report(code ?? 'Auth.Unauthorized');
+        // الجلسة انتهت فعلاً (حتى بعد التجديد)، أو الحساب انوقف وهو داخل (الشركة موقوفة/منتهية، المشرف موقوف، الحساب معطّل)،
+        // أو لازم يغيّر كلمة المرور → التطبيق بيوجّهه (SessionEvents)
+        if (response.statusCode == 401 || _sessionCodes.contains(code)) SessionEvents.report(code ?? 'Auth.Unauthorized');
         throw ApiException(response.statusCode, code);
       }
       final body = utf8.decode(response.bodyBytes);
