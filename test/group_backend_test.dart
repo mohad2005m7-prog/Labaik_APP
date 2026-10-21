@@ -16,6 +16,7 @@ import 'package:labaik/features/chats/data/repositories/server_chat_repository.d
 import 'package:labaik/features/chats/data/sources/chat_api.dart';
 import 'package:labaik/features/chats/data/sources/group_chat_api.dart';
 import 'package:labaik/features/family/domain/entities/family_member.dart';
+import 'package:labaik/features/group/data/models/company_services.dart';
 import 'package:labaik/features/group/data/sources/group_api.dart';
 import 'package:labaik/features/group/domain/entities/group_preview.dart';
 import 'package:labaik/features/group/presentation/l10n/group_join_text.dart';
@@ -212,6 +213,16 @@ void main() {
     final reader = ServerChatRepository(groups: GroupApi(client), groupChat: GroupChatApi(client), direct: ChatApi(client), companyGroupId: 'g1');
     expect((await reader.room('g1')).readOnly, isTrue);
     expect(() => reader.send('g1', clientId: 'y', text: 'x'), throwsA(isA<ApiException>()));
+  });
+
+  test('company services from /home: missing = all on, a disabled one is off', () async {
+    expect(CompanyServices.fromHome(_home()).chatWithGuides, isTrue);
+    final off = CompanyServices.fromHome({..._home(), 'enabledServices': {'gpsTracking': false, 'duaAndRituals': true, 'instantNotifications': true, 'chatWithGuides': false, 'reportsAndStats': true}});
+    expect((off.gpsTracking, off.chatWithGuides, off.duaAndRituals), (false, false, true));
+    final api = GroupApi(FakeServer({'GET /home': (_) => {..._home(group: _group), 'enabledServices': {'chatWithGuides': false}}}).client());
+    await api.myGroup();
+    expect(CompanyServices.current.chatWithGuides, isFalse);
+    CompanyServices.current = CompanyServices.all;
   });
 
   test('location sharing: PUT /location/sharing then POST /location with the position', () async {

@@ -5,6 +5,7 @@ import '../../../auth/data/auth_session.dart';
 import '../../../auth/data/token_refresher.dart';
 import '../../domain/entities/group_member.dart';
 import '../../domain/entities/group_preview.dart';
+import '../models/company_services.dart';
 import '../models/home_group.dart';
 import '../models/member_location_json.dart';
 import 'group_realtime.dart';
@@ -28,7 +29,9 @@ class GroupApi {
 
   /// مجموعتي — ولو تغيّرت عن آخر مرة الاتصال اللحظي بيرجع يشترك (السيرفر بيشترك بمجموعاتي لحظة الاتصال بس)
   Future<HomeGroup?> myGroup() async {
-    final group = HomeGroup.fromHome(await _client.getJson('/home'));
+    final home = await _client.getJson('/home');
+    CompanyServices.current = CompanyServices.fromHome(home);
+    final group = HomeGroup.fromHome(home);
     await GroupRealtime.groupSeen(group?.id);
     return group;
   }
