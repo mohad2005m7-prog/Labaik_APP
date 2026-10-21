@@ -32,7 +32,16 @@ abstract class CompanyRepository {
   Future<List<CompanyGroup>> groups();
 
   /// مجموعة جديدة تحت رحلة (بتبدأ بلا مشرف)
-  Future<CompanyGroup> createGroup({required String tripId, required String name});
+  Future<CompanyGroup> createGroup({required String tripId, required String name, String? notes, int? capacity});
+
+  /// تعديل المجموعة: الاسم والملاحظات والسعة (null = بلا)
+  Future<CompanyGroup> updateGroup(String groupId, {required String name, String? notes, int? capacity});
+
+  /// حذف مجموعة فاضية (409 Group.HasMembers لو فيها معتمرين)
+  Future<void> deleteGroup(String groupId);
+
+  /// كل معتمري الشركة (بلا تكرار) — [search] بالاسم أو الإيميل
+  Future<List<CompanyPilgrim>> pilgrims({String? search});
 
   /// المشرف أول، وبعده المعتمرين بالرقم
   Future<List<CompanyMember>> members(String groupId);

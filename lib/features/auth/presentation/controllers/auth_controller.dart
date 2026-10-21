@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/utils/app_preferences.dart';
 import '../../../../core/utils/token_storage.dart';
 import '../../../company/presentation/pages/company_shell.dart';
@@ -146,6 +147,8 @@ class AuthController {
           'Auth.AccountDisabled' => AuthMessagesText.accountDisabled(),
           'Supervisor.Suspended' => AuthMessagesText.supervisorSuspended(),
           'Auth.EmailNotConfirmed' => AuthMessagesText.emailNotConfirmed(),
+          'Company.Stopped' => ApiErrorText.companyStopped(),
+          'Company.Expired' => ApiErrorText.companyExpired(),
           _ => AuthMessagesText.loginInvalid(),
         };
         ScaffoldMessenger.of(context).showSnackBar(

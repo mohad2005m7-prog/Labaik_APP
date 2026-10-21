@@ -1,10 +1,12 @@
 // -------------------------------------------------------------
 // خطأ من السيرفر: [statusCode] = رد غير 2xx — أو null لما ما في اتصال (انقطاع/مهلة)
+// [code] = "code" من ProblemDetails (Group.CapacityReached، Company.Stopped، Chat.Muted، ...) لو السيرفر بعته
 // -------------------------------------------------------------
 class ApiException implements Exception {
   final int? statusCode;
+  final String? code;
 
-  const ApiException(this.statusCode);
+  const ApiException(this.statusCode, [this.code]);
 
   /// ما في إنترنت أو السيرفر ما رد بالوقت
   bool get isOffline => statusCode == null;
@@ -19,5 +21,5 @@ class ApiException implements Exception {
   bool get isForbidden => statusCode == 403;
 
   @override
-  String toString() => 'ApiException(${statusCode ?? 'offline'})';
+  String toString() => 'ApiException(${statusCode ?? 'offline'}${code == null ? '' : ', $code'})';
 }

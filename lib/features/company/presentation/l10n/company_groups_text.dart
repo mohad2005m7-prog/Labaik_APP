@@ -29,6 +29,23 @@ abstract final class CompanyGroupsText {
   static const noSupervisorOption = Tx('بدون مشرف الآن', 'No supervisor for now');
   static const createButton = Tx('إنشاء المجموعة', 'Create Group');
   static const needTrip = Tx('اختر الرحلة واكتب اسم المجموعة', 'Choose the trip and enter the group name');
+  // السعة والملاحظات (Figma: "اضافة المعتمرون: العدد")
+  static String capacity({bool hajj = false}) => hajj ? tr('عدد الحجاج :', 'Pilgrims capacity:') : tr('عدد المعتمرين :', 'Pilgrims capacity:');
+  static const capacityHint = Tx('العدد الأقصى (اختياري)', 'Maximum number (optional)');
+  static const invalidCapacity = Tx('اكتب عدداً صحيحاً أكبر من صفر', 'Enter a whole number greater than zero');
+  static const notesHint = Tx('اكتب ملاحظاتك (اختياري)', 'Write your notes (optional)');
+  static String pilgrimCountOf(int n, int max, {bool hajj = false}) => hajj ? tr('$n / $max حاج', '$n / $max pilgrims') : tr('$n / $max معتمر', '$n / $max pilgrims');
+
+  // تعديل وحذف المجموعة
+  static const editTitle = Tx('تعديل المجموعة', 'Edit group');
+  static const save = Tx('حفظ', 'Save');
+  static const saved = Tx('تم حفظ المجموعة', 'Group saved');
+  static const deleteGroup = Tx('حذف المجموعة', 'Delete group');
+  static String deleteConfirm(Object name) => tr('حذف «$name»؟ لا يمكن التراجع عن ذلك.', 'Delete "$name"? This cannot be undone.');
+  static const deleted = Tx('تم حذف المجموعة', 'Group deleted');
+  static const hasMembers = Tx('احذف معتمري المجموعة أولاً ثم احذفها', "Remove the group's pilgrims first, then delete it");
+  static const cancel = Tx('إلغاء', 'Cancel');
+  static const full = Tx('المجموعة ممتلئة (وصلت العدد الأقصى)', 'The group is full');
   // بوب-أب (656:4748)
   static const createdTitle = Tx('تم إنشاء المجموعة', 'Group Created');
   static String createdCode(Object code) => tr('رمز الانضمام: $code', 'Join code: $code');

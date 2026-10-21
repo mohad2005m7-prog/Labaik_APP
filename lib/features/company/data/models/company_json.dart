@@ -75,6 +75,9 @@ abstract final class CompanyJson {
         tripName: trip?.title ?? _opt(j, 'tripName') ?? '',
         joinCode: _str(j, 'joinCode'),
         supervisorName: _opt(j, 'supervisorName'),
+        supervisorUserId: _opt(j, 'supervisorUserId') ?? _opt(j, 'supervisorId'),
+        notes: _opt(j, 'notes'),
+        capacity: j.optionalInt('capacity'),
         memberCount: j.optionalInt('pilgrimCount') ?? 0,
         status: trip != null && trip.endedOn(today ?? DateTime.now()) ? CompanyGroupStatus.ended : CompanyGroupStatus.active,
         hajj: trip?.isHajj ?? false,
@@ -129,6 +132,22 @@ abstract final class CompanyJson {
         groupsCount: j.optionalInt('groupsCount') ?? 0,
         suspended: j.field('isDisabled') == true || j.field('isSuspended') == true,
       );
+
+  /// CompanyPilgrimDto { userId, fullName, email, phoneNumber?, groupIds[] }
+  static CompanyPilgrim pilgrim(Map<String, dynamic> j) => CompanyPilgrim(
+        userId: _str(j, 'userId'),
+        name: _str(j, 'fullName'),
+        email: _str(j, 'email'),
+        phone: _opt(j, 'phoneNumber'),
+        groupIds: [for (final g in (j.field('groupIds') as List?) ?? const []) g.toString()],
+      );
+
+  /// جسم إنشاء/تعديل المجموعة (الفاضي بيروح null)
+  static Map<String, dynamic> groupBody({required String name, String? notes, int? capacity}) => {
+        'name': name.trim(),
+        'notes': notes == null || notes.trim().isEmpty ? null : notes.trim(),
+        'capacity': capacity,
+      };
 
   /// NotificationDto — للشركة: 3 مجموعة جديدة، 4 تفعيل مشرف، 5 مجموعة بلا مشرف،
   /// 13/14 مشرف أضاف/شال معتمر (preview = اسم المعتمر) — والباقي بعنوان عام

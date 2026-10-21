@@ -23,7 +23,8 @@ import '../widgets/company_search_field.dart';
 // "أعضاء المجموعة" — مطابقة لـ Figma 755:4070 (والحذف) / 630:3841 (زر الإضافة تحت)
 // البحث ← صفوف كل 53 من y177: الصورة 45 يمين، الاسم (SF Compact Bold 16 #717171 طرفه x316)، والسهم ‹ يسار
 // الضغط → صفحة العضو (والمشرف → صفحة المشرف) | الضغط المطوّل على معتمر → "حذف من المجموعة" (DELETE .../members/{id})
-// "إضافة عضو" → بالإيميل (POST .../members) — بترجع عدد المعتمرين الجديد لو تغيّر
+// "إضافة عضو" → اختيار معتمر من معتمري الشركة (GET /company/pilgrims) أو بالإيميل (POST .../members)
+// بترجع عدد المعتمرين الجديد لو تغيّر
 // -------------------------------------------------------------
 class CompanyMembersScreen extends StatefulWidget {
   final CompanyGroup group;
@@ -66,6 +67,43 @@ class _CompanyMembersScreenState extends State<CompanyMembersScreen> {
   }
 
   Future<void> _add() async {
+    // معتمري الشركة اللي مش بهالمجموعة (لو فشل الطلب منروح للإيميل مباشرة)
+    List<CompanyPilgrim> others = const [];
+    try {
+      final inGroup = {for (final m in _members ?? const <CompanyMember>[]) m.userId};
+      others = [for (final p in await widget.repository.pilgrims()) if (!inGroup.contains(p.userId)) p];
+    } catch (_) {}
+    if (!mounted) return;
+    if (others.isNotEmpty) {
+      final picked = await _pickExisting(others);
+      if (!mounted || picked == null) return;
+      if (picked is CompanyPilgrim) return _addExisting(picked);
+    }
+    return _addByEmail();
+  }
+
+  /// قائمة معتمري الشركة (بحث بالاسم أو الإيميل) — وأول سطر "إضافة بالإيميل"
+  Future<Object?> _pickExisting(List<CompanyPilgrim> pilgrims) => showModalBottomSheet<Object>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        builder: (ctx) => _PilgrimPicker(pilgrims: pilgrims),
+      );
+
+  Future<void> _addExisting(CompanyPilgrim p) async {
+    try {
+      await widget.repository.addMember(widget.group.id, email: p.email);
+      if (!mounted) return;
+      _changed = true;
+      CompanyController.showMessage(context, CompanyFormsText.memberAdded());
+      _load();
+    } catch (e) {
+      if (mounted) CompanyController.showError(context, e);
+    }
+  }
+
+  Future<void> _addByEmail() async {
     final email = CompanySheetField(label: CompanyFormsText.email(), hint: CompanyFormsText.emailHint(), keyboard: TextInputType.emailAddress);
     final name = CompanySheetField(label: CompanyFormsText.fullName(), hint: CompanyFormsText.fullNameHint(), required: false);
     final phone = CompanySheetField(label: CompanyFormsText.phone(), hint: CompanyFormsText.phoneHint(), keyboard: TextInputType.phone, required: false);
@@ -170,4 +208,64 @@ class _CompanyMembersScreenState extends State<CompanyMembersScreen> {
       ];
 
   Widget _note(FigmaCanvas c, String text) => c.text(text, left: 16, top: _firstRowTop + 8, width: 361, height: 22, align: TextAlign.center, style: c.style(14, FigmaWeight.sfRegular, const Color(0xFF717171), lineHeight: null, letterSpacing: 0));
+}
+
+/// منتقي معتمر من معتمري الشركة (مش بـ Figma — بستايل الشركة)
+class _PilgrimPicker extends StatefulWidget {
+  final List<CompanyPilgrim> pilgrims;
+
+  const _PilgrimPicker({required this.pilgrims});
+
+  @override
+  State<_PilgrimPicker> createState() => _PilgrimPickerState();
+}
+
+class _PilgrimPickerState extends State<_PilgrimPicker> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _query.trim().toLowerCase();
+    final shown = [for (final p in widget.pilgrims) if (q.isEmpty || p.name.toLowerCase().contains(q) || p.email.toLowerCase().contains(q)) p];
+    const style = TextStyle(fontFamily: 'NotoSansArabic', color: CompanyColors.green);
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.7,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(CompanyFormsText.pickPilgrim(), style: style.copyWith(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(hintText: CompanyFormsText.searchPilgrims(), prefixIcon: const Icon(Icons.search), isDense: true, border: const OutlineInputBorder()),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_add_alt_1_outlined, color: CompanyColors.green),
+                title: Text(CompanyFormsText.addByEmail(), style: style.copyWith(fontSize: 15, fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.pop(context, 'email'),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: shown.length,
+                  itemBuilder: (context, i) => ListTile(
+                    title: Text(shown[i].name, style: style.copyWith(fontSize: 15)),
+                    subtitle: Text(shown[i].email, textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 12)),
+                    onTap: () => Navigator.pop(context, shown[i]),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -110,9 +110,13 @@ class _CompanyFormSheetState extends State<CompanyFormSheet> {
       setState(() {
         _busy = false;
         _error = switch (e) {
+          // رسالة كود السيرفر أدق (المجموعة ممتلئة، حد الباقة، الخدمة مقفلة...)
+          ApiException(:final code) when ApiErrorText.forCode(code) != null => ApiErrorText.forCode(code)!(),
           ApiException(statusCode: 409) when widget.conflictMessage != null => widget.conflictMessage,
           ApiException(statusCode: 404) when widget.notFoundMessage != null => widget.notFoundMessage,
           ApiException(statusCode: 400 || 422) => CompanyFormsText.invalidData(),
+          // تحقق محلي قبل الإرسال (رسالته جاهزة للعرض)
+          FormatException(:final message) => message,
           _ => ApiErrorText.of(e)(),
         };
       });

@@ -64,7 +64,7 @@ class ApiClient {
           response = await request(_headers(renewed)).timeout(timeout);
         }
       }
-      if (response.statusCode < 200 || response.statusCode >= 300) throw ApiException(response.statusCode);
+      if (response.statusCode < 200 || response.statusCode >= 300) throw ApiException(response.statusCode, _problemCode(response));
       final body = utf8.decode(response.bodyBytes);
       return body.trim().isEmpty ? null : jsonDecode(body);
     } on ApiException {
@@ -80,6 +80,16 @@ class ApiClient {
     } on FormatException {
       // رد مش JSON (صفحة خطأ من الاستضافة مثلاً)
       throw const ApiException(502);
+    }
+  }
+
+  /// "code" من ProblemDetails (لو الجسم JSON)
+  static String? _problemCode(http.Response response) {
+    try {
+      final json = jsonDecode(utf8.decode(response.bodyBytes));
+      return json is Map<String, dynamic> ? json['code']?.toString() : null;
+    } catch (_) {
+      return null;
     }
   }
 

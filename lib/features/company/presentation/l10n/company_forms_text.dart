@@ -76,5 +76,7 @@ abstract final class CompanyFormsText {
   static String pilgrimsCount(int n) => tr('العدد: $n', 'Total: $n');
   static const supervisorNotFound = Tx('هذا المشرف غير موجود في قائمة مشرفي الشركة', 'This supervisor is not on the company roster');
   static const chooseGroup = Tx('اختر المجموعة', 'Choose a group');
+  static const pickPilgrim = Tx('اختر معتمراً من معتمري الشركة', 'Choose one of your pilgrims');
+  static const addByEmail = Tx('+ إضافة معتمر جديد بالإيميل', '+ Add a new pilgrim by email');
   static const noEmail = Tx('لا يوجد بريد إلكتروني لهذا المعتمر', 'This pilgrim has no email');
 }

@@ -50,7 +50,8 @@ class _CompanySupervisorScreenState extends State<CompanySupervisorScreen> {
 
   void _loadGroups() {
     widget.repository.groups().then((all) {
-      if (mounted) setState(() => _groups = [for (final g in all) if (g.supervisorName == _s.name) g]);
+      // بالرقم (supervisorUserId) — وسيرفر أقدم بلاه: بالاسم
+      if (mounted) setState(() => _groups = [for (final g in all) if (g.supervisorUserId != null ? g.supervisorUserId == _s.userId : g.supervisorName == _s.name) g]);
     }, onError: (_) {
       if (mounted) setState(() => _groups = const []);
     });

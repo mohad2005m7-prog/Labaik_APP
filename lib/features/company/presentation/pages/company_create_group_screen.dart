@@ -5,6 +5,7 @@ import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/theme/figma_text.dart';
 import '../../../../core/utils/design_scale.dart';
 import '../../../../core/utils/figma_canvas.dart';
+import '../../../../core/utils/latin_digits.dart';
 import '../../../../core/widgets/figma_page.dart';
 import '../../domain/entities/company_group.dart';
 import '../../domain/entities/company_member.dart';
@@ -34,6 +35,8 @@ class CompanyCreateGroupScreen extends StatefulWidget {
 
 class _CompanyCreateGroupScreenState extends State<CompanyCreateGroupScreen> {
   final _name = TextEditingController();
+  final _capacity = TextEditingController();
+  final _notes = TextEditingController();
   CompanyTrip? _trip;
   CompanySupervisor? _supervisor;
   bool _busy = false;
@@ -47,6 +50,8 @@ class _CompanyCreateGroupScreenState extends State<CompanyCreateGroupScreen> {
   @override
   void dispose() {
     _name.dispose();
+    _capacity.dispose();
+    _notes.dispose();
     super.dispose();
   }
 
@@ -69,9 +74,12 @@ class _CompanyCreateGroupScreenState extends State<CompanyCreateGroupScreen> {
     final trip = _trip;
     if (_busy) return;
     if (trip == null || _name.text.trim().isEmpty) return CompanyController.showMessage(context, CompanyGroupsText.needTrip());
+    final capacityText = latinDigits(_capacity.text.trim());
+    final capacity = capacityText.isEmpty ? null : int.tryParse(capacityText);
+    if (capacityText.isNotEmpty && (capacity == null || capacity <= 0)) return CompanyController.showMessage(context, CompanyGroupsText.invalidCapacity());
     setState(() => _busy = true);
     try {
-      var group = await widget.repository.createGroup(tripId: trip.id, name: _name.text);
+      var group = await widget.repository.createGroup(tripId: trip.id, name: _name.text, notes: _notes.text, capacity: capacity);
       final supervisor = _supervisor;
       if (supervisor != null) {
         try {
@@ -104,8 +112,13 @@ class _CompanyCreateGroupScreenState extends State<CompanyCreateGroupScreen> {
         c.rect(left: 22, top: 246, width: 361, height: 53, child: CompanyPickerBox(s: c.s, value: _trip == null ? null : _tripLabel(_trip!), hint: CompanyGroupsText.tripHint(), onTap: _pickTrip)),
         companyFieldLabel(c, CompanyGroupsText.supervisor(), top: 315, right: 377),
         c.rect(left: 22, top: 345, width: 361, height: 53, child: CompanyPickerBox(s: c.s, value: _supervisor?.name, hint: CompanyGroupsText.supervisorHint(), onTap: _pickSupervisor)),
-        c.button(CompanyGroupsText.createButton(), left: 16, top: 430, figmaSpacing: true, onTap: _submit),
-        if (_busy) c.rect(left: 16, top: 430, width: 361, height: 50, child: const CompanyBusyButton()),
+        // السعة والملاحظات (اختياريين)
+        companyFieldLabel(c, CompanyGroupsText.capacity(hajj: _trip?.isHajj ?? false), top: 414, right: 377),
+        c.rect(left: 22, top: 444, width: 361, height: 53, child: CompanyTextBox(s: c.s, controller: _capacity, hint: CompanyGroupsText.capacityHint(), keyboard: TextInputType.number)),
+        companyFieldLabel(c, CompanyGroupsText.notes(), top: 513, right: 377),
+        c.rect(left: 22, top: 543, width: 361, height: 80, child: CompanyTextBox(s: c.s, controller: _notes, hint: CompanyGroupsText.notesHint(), multiline: true)),
+        c.button(CompanyGroupsText.createButton(), left: 16, top: 650, figmaSpacing: true, onTap: _submit),
+        if (_busy) c.rect(left: 16, top: 650, width: 361, height: 50, child: const CompanyBusyButton()),
       ],
     );
   }

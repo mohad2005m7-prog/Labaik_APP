@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/figma_text.dart';
 import '../../../../core/utils/figma_canvas.dart';
 import '../../../../core/widgets/figma_page.dart';
@@ -24,7 +25,8 @@ typedef CompanyPilgrimRow = ({CompanyGroup group, CompanyMember member});
 // "الحجاج والمعتمرون" — كرت "حجاج / معتمرين" بالرئيسية (أو "معتمر" بتفاصيل الرحلة لرحلة وحدة)
 // كل أعضاء مجموعات الشركة (بلا المشرفين) — بستايل "أعضاء المجموعة" (755:4070):
 // البحث والعدد ← صفوف كل 53: الصورة 45 يمين، الاسم وتحته مجموعته، والسهم ‹ يسار
-// الضغط → صفحة العضو (نفس صفحة المشرف) | مجموعة ما وصلت أعضاءها بتنتجاهل إلا لو فشلوا كلهم
+// الضغط → صفحة العضو (نفس صفحة المشرف) — من GET /company/pilgrims بطلب واحد
+// (سيرفر أقدم: أعضاء كل مجموعة — ومجموعة ما وصلت أعضاءها بتنتجاهل إلا لو فشلوا كلهم)
 // -------------------------------------------------------------
 class CompanyPilgrimsScreen extends StatefulWidget {
   final CompanyRepository repository;
@@ -55,6 +57,19 @@ class _CompanyPilgrimsScreenState extends State<CompanyPilgrimsScreen> {
     try {
       final trip = widget.trip;
       final groups = [for (final g in await widget.repository.groups()) if (trip == null || g.tripId == trip.id) g];
+      // GET /company/pilgrims: كل المعتمرين بطلب واحد (كل معتمر مرة وحدة مع أول مجموعة إله من هالقائمة)
+      try {
+        final byId = {for (final g in groups) g.id: g};
+        final rows = <CompanyPilgrimRow>[
+          for (final p in await widget.repository.pilgrims())
+            if (p.groupIds.map((id) => byId[id]).nonNulls.firstOrNull case final g?) (group: g, member: CompanyMember(userId: p.userId, name: p.name, email: p.email)),
+        ]..sort((a, b) => a.member.name.compareTo(b.member.name));
+        if (mounted) setState(() => _rows = rows);
+        return;
+      } on ApiException catch (e) {
+        if (!e.isMissingOnServer) rethrow;
+      }
+      // سيرفر أقدم: أعضاء كل مجموعة لحالها
       var failures = 0;
       final lists = await Future.wait(groups.map((g) => widget.repository.members(g.id).catchError((Object _) {
             failures++;

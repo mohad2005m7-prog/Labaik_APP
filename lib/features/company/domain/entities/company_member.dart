@@ -52,3 +52,19 @@ class CompanySupervisor extends Equatable {
   @override
   List<Object?> get props => [userId, name, email, phone, groupsCount, suspended];
 }
+
+// -------------------------------------------------------------
+// معتمر من معتمري الشركة (CompanyPilgrimDto من GET /company/pilgrims) — مرة وحدة حتى لو بأكتر من مجموعة
+// -------------------------------------------------------------
+class CompanyPilgrim extends Equatable {
+  final String userId;
+  final String name;
+  final String email;
+  final String? phone;
+  final List<String> groupIds;
+
+  const CompanyPilgrim({required this.userId, required this.name, required this.email, this.phone, this.groupIds = const []});
+
+  @override
+  List<Object?> get props => [userId, name, email, phone, groupIds];
+}

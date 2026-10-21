@@ -12,6 +12,8 @@ import '../../../auth/data/token_refresher.dart';
 //   POST /company/trips                  → TripDto
 //   GET/POST /company/trips/{id}/groups  → CompanyGroupDto[] | CompanyGroupDto (بلا مشرف)
 //   GET  /company/groups                 → كل مجموعات الشركة بطلب واحد (CompanyGroupListItemDto[] — الأقرب رحلة أول)
+//   PUT/DELETE /company/groups/{id}      → الاسم والملاحظات والسعة / حذف مجموعة فاضية (409 Group.HasMembers)
+//   GET  /company/pilgrims?search=&take= → كل معتمري الشركة (بلا تكرار) مع مجموعاتهم
 //   GET/POST /company/groups/{id}/members (+ /{userId}) → صفوف الأعضاء / بطاقة العضو / إضافة معتمر بالإيميل
 //   PUT  /company/groups/{id}/supervisor → تعيين مشرف من قائمة الشركة بالإيميل
 //   GET/POST /company/supervisors        → قائمة مشرفي الشركة / إضافة مشرف (كلمة مؤقتة بالإيميل)
@@ -49,7 +51,14 @@ class CompanyApi {
 
   Future<List<Map<String, dynamic>>> tripGroups(String tripId) async => _list(await _client.getJson('/company/trips/$tripId/groups'));
 
-  Future<Map<String, dynamic>> createGroup(String tripId, String name) async => _map(await _client.postJson('/company/trips/$tripId/groups', body: {'name': name}));
+  Future<Map<String, dynamic>> createGroup(String tripId, Map<String, dynamic> body) async => _map(await _client.postJson('/company/trips/$tripId/groups', body: body));
+
+  Future<Map<String, dynamic>> updateGroup(String groupId, Map<String, dynamic> body) async => _map(await _client.putJson('/company/groups/$groupId', body: body));
+
+  Future<void> deleteGroup(String groupId) => _client.delete('/company/groups/$groupId');
+
+  Future<List<Map<String, dynamic>>> pilgrims({String? search, int take = 200}) async =>
+      _list(await _client.getJson('/company/pilgrims', query: {'take': '$take', if (search != null && search.trim().isNotEmpty) 'search': search.trim()}));
 
   Future<List<Map<String, dynamic>>> members(String groupId) async => _list(await _client.getJson('/company/groups/$groupId/members'));
 

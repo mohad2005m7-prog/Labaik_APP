@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:labaik/core/l10n/api_error_text.dart';
 import 'package:labaik/core/l10n/app_language.dart';
 import 'package:labaik/core/network/api_client.dart';
+import 'package:labaik/core/network/api_exception.dart';
 import 'package:labaik/features/auth/data/auth_session.dart';
 import 'package:labaik/features/company/data/repositories/company_repository_impl.dart';
 import 'package:labaik/features/company/data/sources/company_api.dart';
@@ -99,11 +101,33 @@ class FakeCompany implements CompanyRepository {
   Future<List<CompanyGroup>> groups() async => List.of(groupsList);
 
   @override
-  Future<CompanyGroup> createGroup({required String tripId, required String name}) async {
-    final g = CompanyGroup(id: 'g${groupsList.length + 1}', tripId: tripId, name: name, tripName: 'رحلة العمرة الأولى', joinCode: 'K7P2QX', memberCount: 0, status: CompanyGroupStatus.active);
+  Future<CompanyGroup> createGroup({required String tripId, required String name, String? notes, int? capacity}) async {
+    final g = CompanyGroup(id: 'g${groupsList.length + 1}', tripId: tripId, name: name, tripName: 'رحلة العمرة الأولى', joinCode: 'K7P2QX', memberCount: 0, status: CompanyGroupStatus.active, notes: notes == null || notes.trim().isEmpty ? null : notes.trim(), capacity: capacity);
     groupsList.add(g);
     return g;
   }
+
+  @override
+  Future<CompanyGroup> updateGroup(String groupId, {required String name, String? notes, int? capacity}) async {
+    final i = groupsList.indexWhere((g) => g.id == groupId);
+    final blank = notes == null || notes.trim().isEmpty;
+    return groupsList[i] = groupsList[i].copyWith(name: name, notes: blank ? null : notes.trim(), clearNotes: blank, capacity: capacity, clearCapacity: capacity == null);
+  }
+
+  final deletedGroups = <String>[];
+
+  @override
+  Future<void> deleteGroup(String groupId) async {
+    if (groupsList.firstWhere((g) => g.id == groupId).memberCount > 0) throw const ApiException(409);
+    deletedGroups.add(groupId);
+    groupsList.removeWhere((g) => g.id == groupId);
+  }
+
+  @override
+  Future<List<CompanyPilgrim>> pilgrims({String? search}) async => [
+        for (final m in membersList)
+          if (!m.isSupervisor) CompanyPilgrim(userId: m.userId, name: m.name, email: m.email ?? '${m.userId}@x.com', groupIds: [for (final g in groupsList) g.id]),
+      ];
 
   @override
   Future<List<CompanyMember>> members(String groupId) async => List.of(membersList);
@@ -236,6 +260,43 @@ void main() {
     expect(server.requests.where((r) => r.startsWith('GET /company/trips/')), isEmpty);
   });
 
+  test('server (21 Oct): group notes/capacity on create and edit, delete, /company/pilgrims, error code', () async {
+    final server = fakeServer({
+      'POST /company/trips/t1/groups': {'id': 'g1', 'tripId': 't1', 'name': 'أ', 'joinCode': 'K7', 'pilgrimCount': 0, 'notes': 'باص 3', 'capacity': 40},
+      'PUT /company/groups/g1': {'id': 'g1', 'tripId': 't1', 'name': 'أ2', 'joinCode': 'K7', 'supervisorId': 's1', 'pilgrimCount': 0, 'notes': null, 'capacity': null},
+      'DELETE /company/groups/g1': null,
+      'GET /company/pilgrims': [
+        {'userId': 'p1', 'fullName': 'أحمد', 'email': 'a@x.com', 'phoneNumber': null, 'groupIds': ['g1', 'g2']},
+      ],
+      'GET /company/trips/t1': {'id': 't1', 'name': 'رحلة', 'pilgrimageType': 2, 'departureDate': '2026-11-20', 'status': 1},
+    });
+    final repo = CompanyRepositoryImpl(api: CompanyApi(server.client));
+    final created = await repo.createGroup(tripId: 't1', name: ' أ ', notes: ' باص 3 ', capacity: 40);
+    expect(server.requests.first, contains('{"name":"أ","notes":"باص 3","capacity":40}'));
+    expect((created.notes, created.capacity), ('باص 3', 40));
+    final updated = await repo.updateGroup('g1', name: 'أ2', notes: '  ');
+    expect(server.requests.firstWhere((r) => r.startsWith('PUT')), contains('{"name":"أ2","notes":null,"capacity":null}'));
+    expect((updated.name, updated.notes, updated.capacity, updated.supervisorUserId), ('أ2', null, null, 's1'));
+    await repo.deleteGroup('g1');
+    expect(server.requests.any((r) => r.startsWith('DELETE /company/groups/g1')), isTrue);
+    final pilgrims = await repo.pilgrims();
+    expect((pilgrims.single.name, pilgrims.single.email), ('أحمد', 'a@x.com'));
+    expect(pilgrims.single.groupIds, ['g1', 'g2']);
+  });
+
+  test('ProblemDetails code reaches ApiException and picks the message', () async {
+    final client = ApiClient(
+      baseUrl: 'https://x/api/v1',
+      accessToken: () async => 't',
+      refreshToken: () async => null,
+      client: MockClient((_) async => http.Response(jsonEncode({'title': 'Conflict', 'status': 409, 'code': 'Group.CapacityReached'}), 409, headers: {'content-type': 'application/problem+json'})),
+    );
+    final error = await client.postJson('/company/groups/g1/members').then<Object?>((_) => null, onError: (Object e) => e);
+    expect(error, isA<ApiException>().having((e) => e.code, 'code', 'Group.CapacityReached').having((e) => e.statusCode, 'status', 409));
+    expect(ApiErrorText.of(error!)(), 'المجموعة ممتلئة (وصلت العدد الأقصى)');
+    expect(ApiErrorText.of(const ApiException(403, 'Company.ServiceDisabled'))(), 'هذه الخدمة غير مفعّلة لشركتك');
+  });
+
   test('server: create trip sends the backend contract (numbers + yyyy-MM-dd)', () async {
     final server = fakeServer({
       'POST /company/trips': {'id': 't9', 'name': 'عمرة ديسمبر', 'destinations': ['مكة المكرمة'], 'departureDate': '2026-12-10', 'returnDate': null, 'status': 1},
@@ -354,7 +415,7 @@ void main() {
     await tester.tap(text('إنشاء المجموعة'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(text('اختر الرحلة واكتب اسم المجموعة'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'مجموعة أ');
+    await tester.enterText(find.byType(TextField).first, 'مجموعة أ');
     await tester.tap(text('اختر الرحلة'), warnIfMissed: false);
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('رحلة العمرة الأولى').last);
@@ -567,5 +628,48 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(CompanyTripsScreen), findsOneWidget);
     expect(text('جميع الرحلات'), findsOneWidget);
+  });
+
+  testWidgets('group details: notes shown, edit name/capacity/notes, delete refused with pilgrims then allowed', (tester) async {
+    tester.view.physicalSize = const Size(393 * 3, 852 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final repo = FakeCompany();
+    final group = await repo.createGroup(tripId: '1', name: 'مجموعة النور', notes: 'التجمع عند الباص 3', capacity: 40);
+    repo.groupsList[0] = repo.groupsList[0].copyWith(memberCount: 2);
+    await tester.pumpWidget(MaterialApp(
+      builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+      home: Builder(builder: (context) => TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CompanyGroupDetailScreen(group: repo.groupsList[0], repository: repo))), child: const Text('open'))),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    Finder text(String v) => find.text(v, findRichText: true);
+    expect(find.text('التجمع عند الباص 3'), findsOneWidget);
+    expect(text('2 / 40'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'مجموعة الهدى');
+    await tester.enterText(find.byType(TextField).at(1), '٥٠');
+    await tester.tap(text('حفظ').last, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect((repo.groupsList.single.name, repo.groupsList.single.capacity), ('مجموعة الهدى', 50));
+
+    // فيها معتمرين → السيرفر بيرفض (409)
+    await tester.tap(text('حذف المجموعة').first, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'حذف المجموعة'));
+    await tester.pumpAndSettle();
+    expect(find.text('احذف معتمري المجموعة أولاً ثم احذفها'), findsOneWidget);
+    expect(repo.deletedGroups, isEmpty);
+
+    repo.groupsList[0] = repo.groupsList[0].copyWith(memberCount: 0);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.tap(text('حذف المجموعة').first, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'حذف المجموعة'));
+    await tester.pumpAndSettle();
+    expect(repo.deletedGroups, [group.id]);
+    expect(find.byType(CompanyGroupDetailScreen), findsNothing);
   });
 }

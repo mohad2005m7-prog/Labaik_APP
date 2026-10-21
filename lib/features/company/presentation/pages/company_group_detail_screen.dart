@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/figma_text.dart';
 import '../../../../core/utils/figma_canvas.dart';
+import '../../../../core/utils/latin_digits.dart';
 import '../../../../core/widgets/figma_lines.dart';
 import '../../../../core/widgets/figma_page.dart';
 import '../../domain/entities/company_group.dart';
@@ -12,7 +14,9 @@ import '../../domain/repositories/company_repository.dart';
 import '../controllers/company_controller.dart';
 import '../l10n/company_groups_text.dart';
 import '../widgets/company_box.dart';
+import '../../../supervisor/presentation/widgets/supervisor_colors.dart';
 import '../widgets/company_colors.dart';
+import '../widgets/company_form_sheet.dart';
 import '../widgets/company_group_card.dart';
 
 // -------------------------------------------------------------
@@ -20,7 +24,8 @@ import '../widgets/company_group_card.dart';
 // كرت المجموعة 120 ← "تاريخ الرحلة" و"المعتمرون" ← "عرض جميع الاعضاء" (أو "إضافة اعضاء مجموعة")
 // (اسم المشرف بالكرت بيفتح صفحته)
 // ← "رؤية الدردشة" و"تغيير المشرف" (السهم بيفتح قائمة مشرفي الشركة تحته — Group 82) ← "ملاحظات إضافية"
-// تحتهم رمز الانضمام اللي بيدخله المعتمر (مش بـ Figma — اضغط للنسخ)
+// تحتهم رمز الانضمام اللي بيدخله المعتمر (مش بـ Figma — اضغط للنسخ) و"حذف المجموعة"
+// القلم فوق → تعديل الاسم والسعة والملاحظات (PUT /company/groups/{id})
 // بترجع true للي فتحها لو تغيّر إشي حتى يحدّث القوائم والأرقام
 // -------------------------------------------------------------
 class CompanyGroupDetailScreen extends StatefulWidget {
@@ -91,7 +96,63 @@ class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
   }
 
   Future<void> _openSupervisor() async {
-    if (await CompanyController.openSupervisor(context, widget.repository, name: _group.supervisorName) && mounted) _changed = true;
+    if (await CompanyController.openSupervisor(context, widget.repository, userId: _group.supervisorUserId, name: _group.supervisorName) && mounted) _changed = true;
+  }
+
+  Future<void> _edit() async {
+    final name = CompanySheetField(label: CompanyGroupsText.groupName(), hint: CompanyGroupsText.groupNameHint(), initial: _group.name);
+    final capacity = CompanySheetField(label: CompanyGroupsText.capacity(hajj: _group.hajj), hint: CompanyGroupsText.capacityHint(), keyboard: TextInputType.number, required: false, initial: _group.capacity?.toString() ?? '');
+    final notes = CompanySheetField(label: CompanyGroupsText.notes(), hint: CompanyGroupsText.notesHint(), required: false, initial: _group.notes ?? '');
+    CompanyGroup? saved;
+    final done = await CompanyFormSheet.show(
+      context,
+      CompanyFormSheet(
+        title: CompanyGroupsText.editTitle(),
+        fields: [name, capacity, notes],
+        submitLabel: CompanyGroupsText.save(),
+        conflictMessage: CompanyGroupsText.full(),
+        onSubmit: () async {
+          final text = latinDigits(capacity.value);
+          final max = text.isEmpty ? null : int.tryParse(text);
+          if (text.isNotEmpty && (max == null || max <= 0)) throw FormatException(CompanyGroupsText.invalidCapacity());
+          saved = await widget.repository.updateGroup(_group.id, name: name.value, notes: notes.value, capacity: max);
+        },
+      ),
+    );
+    final updated = saved;
+    if (!done || updated == null || !mounted) return;
+    setState(() {
+      _group = _group.copyWith(name: updated.name, notes: updated.notes, capacity: updated.capacity, clearNotes: updated.notes == null, clearCapacity: updated.capacity == null);
+      _changed = true;
+    });
+    CompanyController.showMessage(context, CompanyGroupsText.saved());
+  }
+
+  Future<void> _delete() async {
+    final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            content: Text(CompanyGroupsText.deleteConfirm(_group.name), style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 15)),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(CompanyGroupsText.cancel())),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(CompanyGroupsText.deleteGroup(), style: const TextStyle(color: SupColors.red, fontWeight: FontWeight.bold))),
+            ],
+          ),
+        ) ??
+        false;
+    if (!ok || !mounted) return;
+    try {
+      await widget.repository.deleteGroup(_group.id);
+      if (!mounted) return;
+      CompanyController.showMessage(context, CompanyGroupsText.deleted());
+      Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.statusCode == 409) return CompanyController.showMessage(context, CompanyGroupsText.hasMembers());
+      CompanyController.showError(context, e);
+    } catch (e) {
+      if (mounted) CompanyController.showError(context, e);
+    }
   }
 
   void _copyCode() {
@@ -123,7 +184,7 @@ class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
 
           // تاريخ الرحلة / المعتمرون
           ..._stat(c, left: 206, icon: 'ic_create_trip', iconLeft: 336, label: CompanyGroupsText.tripDate(), labelRight: 322, value: date == null ? '—' : '${date.day}/${date.month}/${date.year}', valueRight: 328),
-          ..._stat(c, left: 19, icon: 'ic_groups', iconLeft: 149, label: CompanyGroupsText.pilgrims(hajj: group.hajj), labelRight: 141, value: '${group.memberCount}', valueRight: 122),
+          ..._stat(c, left: 19, icon: 'ic_groups', iconLeft: 149, label: CompanyGroupsText.pilgrims(hajj: group.hajj), labelRight: 141, value: group.capacity == null ? '${group.memberCount}' : '${group.memberCount} / ${group.capacity}', valueRight: 122),
 
           // عرض جميع الاعضاء (أو إضافة لو فاضية)
           companyBox(c, left: 16, top: 350, width: 361, height: 53, radius: 10, color: CompanyColors.statCard, shadow: CompanyColors.greenShadow),
@@ -166,10 +227,40 @@ class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
           ),
           c.tapArea(left: 19, top: 419, width: 170.5, height: 73, onTap: _assigning ? () {} : _toggleMenu),
 
-          // ملاحظات إضافية
+          // ملاحظات إضافية (من السيرفر — والضغط بيفتح التعديل)
           FigmaLines.build(c, CompanyGroupsText.notes(), left: 200, top: 516, width: 171, style: c.style(14, FigmaWeight.semiBold, green), wrap: false),
           companyBox(c, left: 16, top: 546, width: 361, height: 74, radius: 10, color: Colors.white, borderColor: const Color(0xFFE5E5EA)),
-          FigmaLines.build(c, CompanyGroupsText.noNotes(), left: 32, top: 562, width: 329, style: c.style(13, FigmaWeight.sfRegular, CompanyColors.secondaryLabel), wrap: false),
+          c.rect(
+            left: 32,
+            top: 556,
+            width: 329,
+            height: 56,
+            child: Align(
+              alignment: AlignmentDirectional.topStart,
+              child: Text(
+                group.notes ?? CompanyGroupsText.noNotes(),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: c.style(13, FigmaWeight.sfRegular, group.notes == null ? CompanyColors.secondaryLabel : green, lineHeight: null, letterSpacing: 0),
+              ),
+            ),
+          ),
+          c.tapArea(left: 16, top: 546, width: 361, height: 74, onTap: _edit),
+          // القلم: تعديل المجموعة
+          c.rect(left: 16, top: 61, width: 40, height: 40, child: IconButton(padding: EdgeInsets.zero, tooltip: CompanyGroupsText.editTitle(), onPressed: _edit, icon: Icon(Icons.edit_outlined, size: c.s.x(22), color: green))),
+          // حذف المجموعة (السيرفر بيرفض لو فيها معتمرين)
+          c.rect(
+            left: 16,
+            top: group.joinCode.isEmpty ? 640 : 720,
+            width: 361,
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: _delete,
+              style: OutlinedButton.styleFrom(foregroundColor: SupColors.red, side: BorderSide(color: SupColors.red.withValues(alpha: 0.5)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(c.s.x(10)))),
+              icon: Icon(Icons.delete_outline_rounded, size: c.s.x(20)),
+              label: Text(CompanyGroupsText.deleteGroup(), style: c.style(14, FigmaWeight.semiBold, SupColors.red, lineHeight: null, letterSpacing: 0)),
+            ),
+          ),
 
           // رمز الانضمام
           if (group.joinCode.isNotEmpty) ...[

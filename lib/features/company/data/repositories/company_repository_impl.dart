@@ -99,10 +99,22 @@ class CompanyRepositoryImpl implements CompanyRepository {
   }
 
   @override
-  Future<CompanyGroup> createGroup({required String tripId, required String name}) async {
-    final json = await _api.createGroup(tripId, name.trim());
+  Future<CompanyGroup> createGroup({required String tripId, required String name, String? notes, int? capacity}) async {
+    final json = await _api.createGroup(tripId, CompanyJson.groupBody(name: name, notes: notes, capacity: capacity));
     return CompanyJson.group(json, trip: await _tripOf(tripId));
   }
+
+  @override
+  Future<CompanyGroup> updateGroup(String groupId, {required String name, String? notes, int? capacity}) async {
+    final json = await _api.updateGroup(groupId, CompanyJson.groupBody(name: name, notes: notes, capacity: capacity));
+    return CompanyJson.group(json, trip: await _tripOf(json['tripId']?.toString() ?? ''));
+  }
+
+  @override
+  Future<void> deleteGroup(String groupId) => _api.deleteGroup(groupId);
+
+  @override
+  Future<List<CompanyPilgrim>> pilgrims({String? search}) async => [for (final j in await _api.pilgrims(search: search)) CompanyJson.pilgrim(j)];
 
   @override
   Future<List<CompanyMember>> members(String groupId) async => [for (final j in await _api.members(groupId)) CompanyJson.member(j)];
