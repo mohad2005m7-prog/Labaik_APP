@@ -75,6 +75,9 @@ class CompanyRepositoryImpl implements CompanyRepository {
   Future<List<CompanyNotification>> notifications() async => [for (final j in await _api.notifications()) ?CompanyJson.notification(j)];
 
   @override
+  Future<void> markNotificationsRead() => _api.readAllNotifications();
+
+  @override
   Future<List<CompanyGroup>> groups() async {
     final results = await Future.wait<Object>([_api.trips(), _api.allGroups().then<Object>((v) => v, onError: (Object e) => e)]);
     final trips = [for (final t in results[0] as List<Map<String, dynamic>>) CompanyJson.trip(t)];

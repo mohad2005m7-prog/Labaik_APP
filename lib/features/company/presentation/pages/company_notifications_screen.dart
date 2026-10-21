@@ -7,6 +7,7 @@ import '../../../../core/theme/figma_text.dart';
 import '../../../../core/utils/figma_canvas.dart';
 import '../../../../core/widgets/figma_page.dart';
 import '../../domain/entities/company_notification.dart';
+import '../controllers/company_controller.dart';
 import '../cubits/company_notifications_cubit.dart';
 import '../l10n/company_notifications_text.dart';
 import '../widgets/company_colors.dart';
@@ -39,7 +40,7 @@ class CompanyNotificationsScreen extends StatelessWidget {
               : [
                   for (final (i, day) in days.indexed) ...[
                     _dayLabel(c, day.first.createdAt, layout.tops[i].$1, first: i == 0),
-                    for (final (j, n) in day.indexed) ...CompanyNotificationCard.build(c, top: layout.tops[i].$2 + j * _pitch, title: n.title, body: n.body, important: n.important),
+                    for (final (j, n) in day.indexed) ...CompanyNotificationCard.build(c, top: layout.tops[i].$2 + j * _pitch, title: n.title, body: n.body, important: !n.isRead, onTap: () => CompanyController.openNotification(context, n)),
                   ],
                 ],
         );

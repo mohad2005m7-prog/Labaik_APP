@@ -17,8 +17,8 @@ class NotificationsState extends Equatable {
 
   const NotificationsState({this.items = const [], this.loading = true, this.error});
 
-  /// شاشة المعتمر (Figma 114:10192): إشعارات الإعلانات — "انضم عضو" للمشرف بس
-  List<AppNotification> get visible => [for (final n in items) if (n.kind == NotificationKind.announcement) n];
+  /// شاشة المعتمر (Figma 114:10192): كل إشعاراته — "انضم عضو" للمشرف بس
+  List<AppNotification> get visible => [for (final n in items) if (n.kind != NotificationKind.memberJoined) n];
 
   @override
   List<Object?> get props => [items, loading, error];

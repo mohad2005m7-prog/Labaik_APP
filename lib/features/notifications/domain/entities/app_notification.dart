@@ -1,12 +1,28 @@
 import 'package:equatable/equatable.dart';
 
-/// أنواع الإشعارات اللي بيبعتها السيرفر (type) — أي نوع تاني بيتجاهله التطبيق
+/// أنواع الإشعارات اللي بيبعتها السيرفر (type)
 enum NotificationKind {
   /// 1 AnnouncementPosted — لكل أعضاء المجموعة غير الكاتب ([AppNotification.preview] = عنوان الإعلان)
   announcement,
 
   /// 2 MemberJoinedGroup — لمشرف المجموعة بس ([AppNotification.preview] = اسم العضو)
   memberJoined,
+
+  /// 6 GatheringPointChanged — ([AppNotification.preview] = العنوان)
+  gatheringPoint,
+
+  /// 8 GroupMessagePosted / 9 SupervisorMessagePosted — ([AppNotification.preview] = نص الرسالة)
+  groupMessage,
+  supervisorMessage,
+
+  /// 11 LostChildReported — ([AppNotification.preview] = الوصف)
+  lostChild,
+
+  /// 12 FamilyMemberJoined — ([AppNotification.preview] = اسم العضو الجديد)
+  familyJoined,
+
+  /// أي نوع تاني (أو جديد بالسيرفر) — بيطلع "إشعار جديد" مع نصه
+  other,
 }
 
 // -------------------------------------------------------------

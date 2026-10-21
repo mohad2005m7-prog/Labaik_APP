@@ -100,8 +100,8 @@ void main() {
     final sections = await repo.getNotifications();
     expect(sections.first.label, 'اليوم');
     expect(sections.last.label, startsWith('الأمس '));
-    expect(sections.first.items.single.title, 'انضم سهاد علي إلى مجموعتك');
-    expect(sections.first.items.single.body, 'المجموعة الأولى');
+    expect(sections.first.items.map((n) => n.title), ['انضم سهاد علي إلى مجموعتك', 'إشعار جديد']);
+    expect(sections.first.items.map((n) => n.body), ['المجموعة الأولى', 'نوع جديد']);
     expect(sections.last.items.single.title, 'إعلان جديد');
     expect(sections.last.items.single.body, 'تعديل موعد الزيارة');
 
@@ -257,13 +257,21 @@ void main() {
     await cubit.close();
   });
 
-  test('notification sections: unknown types are ignored, older days use the date', () {
+  test('notification sections: every type is shown (unknown → generic), older days use the date', () {
     final now = DateTime(2026, 10, 16, 12);
+    final at = DateTime(2026, 10, 12, 9).toUtc().toIso8601String();
     final sections = NotificationSections.fromJson([
-      {'id': 'n1', 'type': 1, 'preview': 'تذكير', 'createdAtUtc': DateTime(2026, 10, 12, 9).toUtc().toIso8601String()},
-      {'id': 'n2', 'type': 7, 'preview': 'x', 'createdAtUtc': DateTime(2026, 10, 12, 9).toUtc().toIso8601String()},
-    ], now: now);
+      {'id': 'n1', 'type': 1, 'preview': 'تذكير', 'createdAtUtc': at},
+      {'id': 'n2', 'type': 10, 'groupId': 'g1', 'preview': 'أحمد', 'createdAtUtc': at},
+      {'id': 'n3', 'type': 16, 'preview': 'شركة النور', 'createdAtUtc': at},
+      {'id': 'n4', 'type': 99, 'preview': 'جديد', 'createdAtUtc': at},
+    ], groupId: 'g1', groupName: 'طول بالك', now: now);
     expect(sections.single.label, '12 أكتوبر 2026');
-    expect(sections.single.items.single.body, 'تذكير');
+    final items = sections.single.items;
+    expect(items.map((n) => n.body), ['تذكير', 'طول بالك', 'شركة النور', 'جديد']);
+    expect(items[1].title, 'بلاغ طوارئ من أحمد');
+    expect(items[1].important, isTrue);
+    expect(items[2].title, 'تم إيقاف حسابك كمشرف');
+    expect(items[3].title, 'إشعار جديد');
   });
 }

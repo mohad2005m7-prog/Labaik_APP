@@ -82,12 +82,13 @@ class NotificationsScreen extends StatelessWidget {
   }
 
   List<Widget> _card(BuildContext context, FigmaCanvas c, AppNotification n, double top) {
+    final text = NotificationsText.of(n.kind, n.preview);
     return NotificationCard.build(
       c,
       top: top,
-      title: NotificationsText.announcementTitle(),
-      body: NotificationsText.announcementBody(),
-      onTap: () => NotificationsController.openAnnouncement(context, n),
+      title: text.title,
+      body: text.body,
+      onTap: () => NotificationsController.openNotification(context, n),
     );
   }
 

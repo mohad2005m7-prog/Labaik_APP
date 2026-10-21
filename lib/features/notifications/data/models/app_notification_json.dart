@@ -3,17 +3,23 @@ import '../../domain/entities/app_notification.dart';
 
 // -------------------------------------------------------------
 // NotificationDto من السيرفر (الـ enums أرقام):
-// { "id", "type" (1 AnnouncementPosted · 2 MemberJoinedGroup), "groupId", "referenceId", "preview", "createdAtUtc", "isRead" }
-// null = نوع ما بنعرفه (ممكن ينضاف أنواع جديدة بدون إصدار جديد من الـ API — بنتجاهلها)
+// { "id", "type" (1 إعلان · 2 انضمام عضو · 6 نقطة تجمع · 8/9 رسالة · 11 طفل مفقود · 12 انضمام للعائلة), "groupId", "referenceId", "preview", "createdAtUtc", "isRead" }
+// أي نوع جديد بالسيرفر → NotificationKind.other (ما بنخفي إشعار) — null بس لو ما في type
 // -------------------------------------------------------------
 abstract final class AppNotificationJson {
   static AppNotification? fromJson(Map<String, dynamic> json) {
-    final kind = switch (json.optionalInt('type')) {
+    final type = json.optionalInt('type');
+    if (type == null) return null;
+    final kind = switch (type) {
       1 => NotificationKind.announcement,
       2 => NotificationKind.memberJoined,
-      _ => null,
+      6 => NotificationKind.gatheringPoint,
+      8 => NotificationKind.groupMessage,
+      9 => NotificationKind.supervisorMessage,
+      11 => NotificationKind.lostChild,
+      12 => NotificationKind.familyJoined,
+      _ => NotificationKind.other,
     };
-    if (kind == null) return null;
     String? text(String name) {
       final value = json.field(name)?.toString().trim();
       return value == null || value.isEmpty ? null : value;

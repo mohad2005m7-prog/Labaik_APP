@@ -21,8 +21,9 @@ abstract final class NotificationsController {
         MaterialPageRoute(builder: (_) => BlocProvider(create: (_) => NotificationsCubit(repository())..start(), child: const NotificationsScreen())),
       );
 
-  /// "تفاصيل الإعلان" للمعتمر لسا ما انبنت
-  static void openAnnouncement(BuildContext context, AppNotification notification) {
+  /// الضغط على إشعار: الإعلان → تفاصيله (لسا ما انبنت للمعتمر)، والباقي نصه كامل بالكرت
+  static void openNotification(BuildContext context, AppNotification notification) {
+    if (notification.kind != NotificationKind.announcement) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(CommonText.comingSoon()), duration: const Duration(milliseconds: 1600)));

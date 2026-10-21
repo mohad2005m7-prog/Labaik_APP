@@ -19,6 +19,7 @@ import '../../../terms/presentation/controllers/terms_controller.dart';
 import '../../data/repositories/company_repository_impl.dart';
 import '../../domain/entities/company_group.dart';
 import '../../domain/entities/company_member.dart';
+import '../../domain/entities/company_notification.dart';
 import '../../domain/entities/company_profile.dart';
 import '../../domain/entities/company_trip.dart';
 import '../../domain/repositories/company_repository.dart';
@@ -79,8 +80,31 @@ abstract final class CompanyController {
     final repo = context.read<CompanyRepository>();
     return Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => BlocProvider(create: (_) => CompanyNotificationsCubit(repo)..load(), child: const CompanyNotificationsScreen())),
+      MaterialPageRoute(
+        builder: (_) => RepositoryProvider.value(
+          value: repo,
+          child: BlocProvider(create: (_) => CompanyNotificationsCubit(repo)..load(), child: const CompanyNotificationsScreen()),
+        ),
+      ),
     );
+  }
+
+  /// الضغط على إشعار → موضوعه: المجموعة (3، 5، 13، 14) أو المشرف (4، 16، 17)
+  static Future<void> openNotification(BuildContext context, CompanyNotification n) async {
+    final repo = context.read<CompanyRepository>();
+    final groupId = n.groupId;
+    if (groupId != null && groupId.isNotEmpty) {
+      try {
+        final group = (await repo.groups()).where((g) => g.id == groupId).firstOrNull;
+        if (!context.mounted) return;
+        if (group == null) return showMessage(context, CompanyFormsText.groupGone());
+        await openGroupFrom(context, repo, group);
+      } catch (e) {
+        if (context.mounted) showError(context, e);
+      }
+      return;
+    }
+    if (n.type == 4 || n.type == 16 || n.type == 17) await openSupervisor(context, repo, userId: n.referenceId, name: n.body);
   }
 
   // ───────── الرحلات ─────────

@@ -175,6 +175,10 @@ abstract final class CompanyJson {
       body: _opt(j, 'preview') ?? '',
       important: type == 3 || type == 5,
       createdAt: created,
+      isRead: j.field('isRead') == true,
+      type: type,
+      groupId: _opt(j, 'groupId'),
+      referenceId: _opt(j, 'referenceId'),
     );
   }
 }

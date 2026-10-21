@@ -85,6 +85,8 @@ class CompanyApi {
 
   Future<String> supervisorTempPassword(String userId) async => _map(await _client.postJson('/company/supervisors/$userId/temp-password'))['temporaryPassword']?.toString() ?? '';
 
+  Future<void> readAllNotifications() => _client.postJson('/notifications/read-all');
+
   Future<List<Map<String, dynamic>>> notifications({int take = 50}) async => _list(await _client.getJson('/notifications', query: {'take': '$take'}));
 
   static Map<String, dynamic> _map(Object? data) {

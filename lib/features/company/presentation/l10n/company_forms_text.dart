@@ -87,5 +87,6 @@ abstract final class CompanyFormsText {
   static String deleteTripConfirm(Object name) => tr('حذف «$name» ومجموعاتها الفارغة؟ لا يمكن التراجع عن ذلك.', 'Delete "$name" and its empty groups? This cannot be undone.');
   static const tripDeleted = Tx('تم حذف الرحلة', 'Trip deleted');
   static const tripHasPilgrims = Tx('في مجموعات هذه الرحلة معتمرون، احذفهم من المجموعات أولاً', "This trip's groups have pilgrims, remove them first");
+  static const groupGone = Tx('هذه المجموعة لم تعد موجودة', 'This group no longer exists');
   static const noEmail = Tx('لا يوجد بريد إلكتروني لهذا المعتمر', 'This pilgrim has no email');
 }

@@ -15,6 +15,8 @@ abstract final class CompanyNotificationsText {
   static const groupWithoutSupervisor = Tx('مجموعة بدون مشرف', 'Group without a supervisor');
   static const memberAdded = Tx('أضاف المشرف معتمراً للمجموعة', 'A supervisor added a pilgrim');
   static const memberRemoved = Tx('أزال المشرف معتمراً من المجموعة', 'A supervisor removed a pilgrim');
+  static const supervisorSuspended = Tx('تم إيقاف حساب مشرف', 'Supervisor suspended');
+  static const supervisorReactivated = Tx('تمت إعادة تفعيل حساب مشرف', 'Supervisor reactivated');
   static const other = Tx('إشعار جديد', 'New notification');
 
   static String titleFor(int type) => switch (type) {
@@ -23,6 +25,8 @@ abstract final class CompanyNotificationsText {
         5 => groupWithoutSupervisor(),
         13 => memberAdded(),
         14 => memberRemoved(),
+        16 => supervisorSuspended(),
+        17 => supervisorReactivated(),
         _ => other(),
       };
 

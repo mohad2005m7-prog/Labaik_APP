@@ -11,6 +11,7 @@ import 'package:labaik/features/notifications/domain/entities/app_notification.d
 import 'package:labaik/features/notifications/domain/repositories/notifications_repository.dart';
 import 'package:labaik/features/notifications/presentation/controllers/notifications_controller.dart';
 import 'package:labaik/features/notifications/presentation/cubits/notifications_cubit.dart';
+import 'package:labaik/features/notifications/presentation/l10n/notifications_text.dart';
 import 'package:labaik/features/notifications/presentation/pages/notifications_screen.dart';
 import 'package:labaik/features/notifications/presentation/widgets/notification_day_label.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,13 +58,16 @@ void main() {
     });
     final repo = NotificationsRepositoryImpl(api: NotificationsApi(server.client()));
     final items = await repo.list();
-    expect(items.map((n) => n.kind), [NotificationKind.announcement, NotificationKind.memberJoined]);
+    expect(items.map((n) => n.kind), [NotificationKind.announcement, NotificationKind.memberJoined, NotificationKind.supervisorMessage]);
     expect(items.first.referenceId, 'a1');
     expect(items.first.createdAt, DateTime.utc(2026, 10, 16, 9, 40).toLocal());
     expect(items.first.isRead, isFalse);
     await repo.markAllRead();
     expect(server.requests.last.url.path, '/api/v1/notifications/read-all');
-    expect(AppNotificationJson.fromJson({'id': 'x', 'type': 3}), isNull);
+    // نوع ما بنعرفه بيطلع "إشعار جديد" (ما بنخفيه) — وبدون type بس بنتجاهله
+    expect(AppNotificationJson.fromJson({'id': 'x', 'type': 99})?.kind, NotificationKind.other);
+    expect(AppNotificationJson.fromJson({'id': 'x'}), isNull);
+    expect(NotificationsText.of(NotificationKind.groupMessage, 'وصلنا').body, 'وصلنا');
   });
 
   test('cubit: loads, marks all read only when something is unread, reloads on a live notification', () async {

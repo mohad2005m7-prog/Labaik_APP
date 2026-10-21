@@ -5,8 +5,8 @@ import '../../presentation/widgets/supervisor_format.dart';
 
 // -------------------------------------------------------------
 // إشعارات السيرفر (NotificationDto — من الأحدث) → أقسام شاشة الإشعارات حسب اليوم ("اليوم"، "الأمس"، التاريخ)
-// { "id", "type" (1 AnnouncementPosted · 2 MemberJoinedGroup), "groupId", "referenceId", "preview", "createdAtUtc", "isRead" }
-// الجملة من التطبيق حسب النوع، وأي نوع ما بنعرفه بنتجاهله (ممكن ينضاف أنواع جديدة بدون إصدار جديد)
+// { "id", "type" (1 إعلان · 2 انضمام عضو · 7 وصول معتمر · 8/9 رسالة مجموعة · 10 طوارئ · 11 طفل مفقود · 15 رسالة خاصة · 16/17 إيقاف/تفعيل حسابي), "groupId", "referenceId", "preview", "createdAtUtc", "isRead" }
+// الجملة من التطبيق حسب النوع، وأي نوع جديد بيطلع "إشعار جديد" مع نصه (ما بنخفي إشعار)
 // [groupName]: اسم مجموعتي (تحت "انضم … إلى مجموعتك")
 // -------------------------------------------------------------
 abstract final class NotificationSections {
@@ -20,16 +20,34 @@ abstract final class NotificationSections {
         case 1:
           item = SupervisorNotification(title: SupNotificationsText.newAnnouncement(), body: preview);
         case 2:
-          final group = groupName != null && json.field('groupId')?.toString() == groupId ? groupName : '';
-          item = SupervisorNotification(title: SupNotificationsText.memberJoined(preview), body: group);
+          item = SupervisorNotification(title: SupNotificationsText.memberJoined(preview), body: _group(json, groupId, groupName));
+        case 7:
+          item = SupervisorNotification(title: SupNotificationsText.pilgrimArrived(preview), body: _group(json, groupId, groupName));
+        case 8:
+          item = SupervisorNotification(title: SupNotificationsText.groupMessage(), body: preview);
+        case 9:
+          item = SupervisorNotification(title: SupNotificationsText.supervisorMessage(), body: preview);
+        case 10:
+          item = SupervisorNotification(title: SupNotificationsText.emergency(preview), body: _group(json, groupId, groupName), important: true);
+        case 11:
+          item = SupervisorNotification(title: SupNotificationsText.lostChild(), body: preview, important: true);
+        case 15:
+          item = SupervisorNotification(title: SupNotificationsText.directMessage(), body: preview);
+        case 16:
+          item = SupervisorNotification(title: SupNotificationsText.suspended(), body: preview, important: true);
+        case 17:
+          item = SupervisorNotification(title: SupNotificationsText.reactivated(), body: preview);
         default:
-          continue;
+          item = SupervisorNotification(title: SupNotificationsText.other(), body: preview);
       }
       final at = DateTime.tryParse(json.field('createdAtUtc')?.toString() ?? '')?.toLocal() ?? DateTime.now();
       sections.putIfAbsent(SupFormat.daysAgo(at, now: now), () => (_label(at, now), [])).$2.add(item);
     }
     return [for (final s in sections.values) NotificationSection(label: s.$1, items: s.$2)];
   }
+
+  /// اسم مجموعتي لو الإشعار عنها
+  static String _group(Map<String, dynamic> json, String? groupId, String? groupName) => groupName != null && json.field('groupId')?.toString() == groupId ? groupName : '';
 
   // زي Figma: "اليوم" و"الأمس 9:40" — والأقدم بالتاريخ
   static String _label(DateTime at, DateTime? now) => switch (SupFormat.daysAgo(at, now: now)) {

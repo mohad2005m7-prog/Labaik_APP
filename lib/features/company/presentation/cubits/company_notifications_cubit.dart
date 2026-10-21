@@ -15,7 +15,8 @@ class CompanyNotificationsState extends Equatable {
 }
 
 // -------------------------------------------------------------
-// إشعارات الشركة (من الجرس بالرئيسية)
+// إشعارات الشركة (من الجرس بالرئيسية) — الجديدة بتنعرض مميّزة هالمرة، وبتتعلّم مقروءة بالسيرفر
+// (المرة الجاية بتطلع عادية)
 // -------------------------------------------------------------
 class CompanyNotificationsCubit extends Cubit<CompanyNotificationsState> {
   CompanyNotificationsCubit(this._repository) : super(const CompanyNotificationsState());
@@ -26,6 +27,11 @@ class CompanyNotificationsCubit extends Cubit<CompanyNotificationsState> {
     try {
       final items = await _repository.notifications();
       if (!isClosed) emit(CompanyNotificationsState(loading: false, items: items));
+      if (items.any((n) => !n.isRead)) {
+        try {
+          await _repository.markNotificationsRead();
+        } catch (_) {}
+      }
     } catch (_) {
       if (!isClosed) emit(CompanyNotificationsState(loading: false, items: state.items));
     }

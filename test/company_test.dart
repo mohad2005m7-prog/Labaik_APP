@@ -110,6 +110,11 @@ class FakeCompany implements CompanyRepository {
     return CompanyTrip(id: '9', title: draft.name, destinations: draft.destinations.join('، '), dates: '', status: CompanyTripStatus.upcoming);
   }
 
+  var notificationsRead = 0;
+
+  @override
+  Future<void> markNotificationsRead() async => notificationsRead++;
+
   @override
   Future<List<CompanyNotification>> notifications() async => [
         CompanyNotification(id: '1', title: 'تم إنشاء مجموعة جديدة', body: 'تم إنشاء مجموعة بنجاح.', important: true, createdAt: DateTime.now()),

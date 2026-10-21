@@ -37,6 +37,9 @@ abstract class CompanyRepository {
   /// من الأحدث للأقدم
   Future<List<CompanyNotification>> notifications();
 
+  /// كل الإشعارات صارت مقروءة (POST /notifications/read-all)
+  Future<void> markNotificationsRead();
+
   /// مجموعات الشركة (كل رحلاتها)
   Future<List<CompanyGroup>> groups();
 
