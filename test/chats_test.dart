@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -10,8 +10,8 @@ import 'package:labaik/core/network/api_client.dart';
 import 'package:labaik/core/utils/geo_utils.dart';
 import 'package:labaik/features/auth/data/account_registry.dart';
 import 'package:labaik/features/chats/data/sources/chat_api.dart';
-import 'package:labaik/features/chats/data/sources/chat_hub.dart';
 import 'package:labaik/features/chats/domain/entities/chat_message.dart';
+import 'package:labaik/features/chats/domain/entities/chat_room.dart';
 import 'package:labaik/features/chats/domain/entities/conversation_summary.dart';
 import 'package:labaik/features/chats/presentation/controllers/chats_controller.dart';
 import 'package:labaik/features/chats/presentation/cubits/chats_list_cubit.dart';
@@ -27,7 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'fakes/fake_chat_repository.dart';
 
 // -------------------------------------------------------------
-// الدردشات: طلبات السيرفر (القائمة، الرسائل، الإرسال، القراءة)، الاتصال اللحظي (SignalR) مع سيرفر WebSocket محلي،
+// الدردشات: طلبات السيرفر الفردية (/chats: القائمة، البدء، الرسائل، الإرسال، القراءة)،
 // المحادثة (إرسال فوري، بدون تكرار، إعادة المحاولة)، القائمة (المثبّتة فوق، البحث، غير المقروء)،
 // والتنقل: شريط التنقل → الدردشات → المحادثة → مركز المساعدة → الدردشات → الرئيسية
 // -------------------------------------------------------------
@@ -41,103 +41,52 @@ void main() {
     AppLanguage.notifier.value = 'ar';
   });
 
-  test('server API: conversations, messages (isMine from the JWT), send, read', () async {
+  test('direct chat API (/chats): conversations, start, history oldest-first, send {body}, read', () async {
     final requests = <http.Request>[];
     const json = {'content-type': 'application/json; charset=utf-8'};
     final client = MockClient((request) async {
       requests.add(request);
-      final path = request.url.path;
-      if (path.endsWith('/chats') && request.method == 'GET') {
-        return http.Response(
-          jsonEncode({
-            'data': [
-              {
-                'id': 'c1',
-                'title': 'أحمد محمد',
-                'isPinned': true,
-                'unreadCount': 2,
-                'lastMessage': {'id': 'm5', 'conversationId': 'c1', 'senderId': '7', 'text': 'التجمع عند البوابة المحددة', 'sentAt': '2026-10-15T09:12:00Z'},
-              },
-              {'Id': 'g1', 'Title': 'مجموعة حملة النور', 'IsGroup': true},
-            ],
-          }),
-          200,
-          headers: json,
-        );
+      final path = request.url.path.replaceFirst('/api/v1', '');
+      final key = '${request.method} $path';
+      switch (key) {
+        case 'GET /chats':
+          return http.Response(jsonEncode([
+            {'id': 'c1', 'otherUserId': '7', 'otherName': 'أحمد محمد', 'otherPhotoUrl': null, 'lastMessage': 'وين انت؟', 'lastMessageAtUtc': '2026-10-21T10:01:00Z', 'unreadCount': 2},
+          ]), 200, headers: json);
+        case 'POST /chats/direct':
+          return http.Response(jsonEncode({'id': 'c1', 'otherUserId': '7', 'otherName': 'أحمد محمد', 'unreadCount': 0}), 200, headers: json);
+        case 'GET /chats/c1/messages':
+          return http.Response(jsonEncode([
+            {'id': 'm2', 'conversationId': 'c1', 'senderId': '7', 'senderName': 'أحمد محمد', 'body': 'وين انت؟', 'sentAtUtc': '2026-10-21T10:01:00Z', 'isRead': false},
+            {'id': 'm1', 'conversationId': 'c1', 'senderId': 'u1', 'senderName': 'محمد', 'body': 'مرحبا', 'sentAtUtc': '2026-10-21T10:00:00Z', 'isRead': true},
+          ]), 200, headers: json);
+        case 'POST /chats/c1/messages':
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(jsonEncode({'id': 'm3', 'conversationId': 'c1', 'senderId': 'u1', 'body': body['body'], 'sentAtUtc': '2026-10-21T10:02:00Z', 'isRead': false}), 201, headers: json);
+        case 'POST /chats/c1/messages/read':
+          return http.Response('', 204);
       }
-      if (path.endsWith('/chats/c1/messages') && request.method == 'GET') {
-        return http.Response(
-          jsonEncode([
-            {'id': 'm1', 'senderId': 'u1', 'text': 'مرحبا', 'sentAt': '2026-10-15T10:00:00Z'},
-            {'id': 'm2', 'senderId': '7', 'senderName': 'أحمد محمد', 'latitude': 21.42, 'longitude': 39.82, 'sentAt': '2026-10-15T10:01:00Z'},
-          ]),
-          200,
-          headers: json,
-        );
-      }
-      if (path.endsWith('/chats/c1/messages') && request.method == 'POST') {
-        final body = jsonDecode(request.body) as Map<String, dynamic>;
-        return http.Response(jsonEncode({'id': 'm3', 'clientId': body['clientId'], 'text': body['text'], 'sentAt': '2026-10-15T10:02:00Z'}), 201, headers: json);
-      }
-      if (path.endsWith('/chats/c1/read')) return http.Response('', 204);
       return http.Response('', 404);
     });
     final api = ChatApi(ApiClient(baseUrl: 'https://api.test/api/v1', accessToken: () async => 'tok', refreshToken: () async => null, client: client));
 
     final list = await api.conversations();
-    expect(list.map((c) => c.title), ['أحمد محمد', 'مجموعة حملة النور']);
-    expect(list.first.isPinned, isTrue);
-    expect(list.first.unreadCount, 2);
-    expect(list.first.lastMessage?.fromMe, isFalse);
-    expect(list.last.isGroup, isTrue);
+    expect((list.single.title, list.single.otherUserId, list.single.unreadCount, list.single.lastMessage?.text), ('أحمد محمد', '7', 2, 'وين انت؟'));
+    expect((await api.start('7')).id, 'c1');
+    expect(jsonDecode(requests.last.body), {'userId': '7'});
 
-    final messages = await api.messages('c1', afterId: 'm0');
-    expect(requests.last.url.queryParameters['afterId'], 'm0');
-    expect(messages.map((m) => m.fromMe), [true, false]);
-    expect(messages[1].senderName, 'أحمد محمد');
-    expect(messages[1].location?.latitude, 21.42);
+    final messages = await api.messages('c1');
+    expect(requests.last.url.queryParameters['take'], '50');
+    expect(messages.map((m) => (m.id, m.fromMe)), [('m1', true), ('m2', false)]);
+    expect(messages.last.senderId, '7');
 
-    final saved = await api.send('c1', clientId: 'local-1', text: 'أنا عند الباب');
-    expect(saved.id, 'm3');
-    expect(saved.clientId, 'local-1');
-    expect(saved.fromMe, isTrue);
-    expect(jsonDecode(requests.last.body), {'clientId': 'local-1', 'text': 'أنا عند الباب', 'latitude': null, 'longitude': null});
+    final saved = await api.send('c1', 'أنا عند الباب');
+    expect(jsonDecode(requests.last.body), {'body': 'أنا عند الباب'});
+    expect((saved.id, saved.fromMe), ('m3', true));
 
     await api.markRead('c1');
-    expect(requests.last.method, 'POST');
-    expect(requests.last.url.path, '/api/v1/chats/c1/read');
+    expect(requests.last.url.path, '/api/v1/chats/c1/messages/read');
     expect(requests.every((r) => r.headers['Authorization'] == 'Bearer tok'), isTrue);
-  });
-
-  test('SignalR hub: Bearer token, JSON handshake, ReceiveMessage and ping over a real WebSocket', () async {
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    String? auth;
-    var pings = 0;
-    server.listen((request) async {
-      auth = request.headers.value('authorization');
-      final socket = await WebSocketTransformer.upgrade(request);
-      socket.listen((data) {
-        for (final record in (data as String).split('\u001e').where((r) => r.isNotEmpty)) {
-          final json = jsonDecode(record) as Map<String, dynamic>;
-          if (json['protocol'] == 'json') {
-            // رد الـ handshake ورسالة بنفس الإطار
-            socket.add('{}\u001e{"type":1,"target":"ReceiveMessage","arguments":[{"id":"m9","conversationId":"c1","text":"وصلت؟","isMine":false,"sentAt":"2026-10-15T10:00:00Z"}]}\u001e');
-          } else if (json['type'] == 6) {
-            pings++;
-          }
-        }
-      });
-    });
-    final hub = ChatHub(uri: Uri.parse('ws://127.0.0.1:${server.port}/hubs/chat'), accessToken: () async => 'tok', pingInterval: const Duration(milliseconds: 50));
-    hub.start();
-    final received = await hub.messages.first.timeout(const Duration(seconds: 5));
-    expect(received['text'], 'وصلت؟');
-    expect(auth, 'Bearer tok');
-    expect(hub.isConnected, isTrue);
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    expect(pings, greaterThan(0));
-    await hub.dispose();
-    await server.close(force: true);
   });
 
   test('conversation: my message shows at once, the server copy replaces it (no duplicates), a failed one can be retried, read is sent', () async {
@@ -170,6 +119,66 @@ void main() {
     expect(repo.sent.last.clientId, failed.clientId);
     expect(repo.sent.last.location?.longitude, 39.82);
     await cubit.close();
+  });
+
+  test('group chat permissions: supervisor deletes any message and mutes the sender; live deletions disappear; lock', () async {
+    final now = DateTime.now();
+    final repo = FakeChat()
+      ..roomValue = const ChatRoom(isGroup: true, isSupervisor: true)
+      ..server = [
+        ChatMessage(id: 'm1', clientId: 'm1', conversationId: 'g1', fromMe: false, senderId: 'p1', senderName: 'أحمد', text: 'السلام عليكم', sentAt: now),
+        ChatMessage(id: 'm2', clientId: 'm2', conversationId: 'g1', fromMe: true, text: 'وعليكم السلام', sentAt: now.add(const Duration(seconds: 1))),
+      ];
+    final cubit = ConversationCubit(repo, 'g1', pollInterval: const Duration(hours: 1));
+    await cubit.start();
+    await Future<void>.delayed(Duration.zero);
+    final first = cubit.state.messages.first;
+    expect((cubit.state.canDelete(first), cubit.state.canMute(first)), (true, true));
+    expect(cubit.state.canMute(cubit.state.messages.last), isFalse); // رسالتي
+    await cubit.mute(first, minutes: 60);
+    expect(repo.mutes, [('p1', 60)]);
+    await cubit.delete(first);
+    expect(repo.deletedIds, ['m1']);
+    expect(cubit.state.messages.map((m) => m.id), ['m2']);
+    repo.deletions.add('m2'); // حذفها حدا تاني (SignalR)
+    await Future<void>.delayed(Duration.zero);
+    expect(cubit.state.messages, isEmpty);
+    await cubit.setOnlySupervisorCanPost(true);
+    expect(repo.locks, [true]);
+    expect((cubit.state.room.onlySupervisorCanPost, cubit.state.room.canPost), (true, true)); // المشرف بضل يكتب
+    await cubit.close();
+  });
+
+  test('chat room: who can post (read-only company, muted pilgrim, supervisor-only group, direct)', () {
+    expect(const ChatRoom(isGroup: true, readOnly: true).canPost, isFalse);
+    expect(ChatRoom(isGroup: true, mutedUntil: DateTime.now().add(const Duration(hours: 1))).canPost, isFalse);
+    expect(ChatRoom(isGroup: true, mutedUntil: DateTime.now().subtract(const Duration(minutes: 1))).canPost, isTrue);
+    expect(const ChatRoom(isGroup: true, onlySupervisorCanPost: true).canPost, isFalse);
+    expect(const ChatRoom(isGroup: true, onlySupervisorCanPost: true, isSupervisor: true).canPost, isTrue);
+    expect(ChatRoom.direct.canPost, isTrue);
+    // الفردية ما فيها حذف ولا كتم
+    final m = ChatMessage(id: 'x', clientId: 'x', fromMe: true, sentAt: DateTime.now());
+    expect(const ConversationState().canDelete(m), isFalse);
+  });
+
+  testWidgets('read-only and supervisor-only rooms replace the input with a note', (tester) async {
+    Future<void> pump(ChatRoom room) async {
+      final repo = FakeChat()..roomValue = room;
+      await tester.pumpWidget(MaterialApp(
+        home: BlocProvider(key: ValueKey(room), create: (_) => ConversationCubit(repo, 'g1', pollInterval: const Duration(hours: 1))..start(), child: const ConversationScreen(title: 'حملة النور', isGroup: true)),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    await pump(const ChatRoom(isGroup: true, readOnly: true));
+    expect(find.text('قراءة فقط: دردشة المجموعة بين المشرف والمعتمرين'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    await pump(const ChatRoom(isGroup: true, onlySupervisorCanPost: true));
+    expect(find.text('الكتابة في هذه المجموعة للمشرف فقط'), findsOneWidget);
+    await pump(const ChatRoom(isGroup: true, isSupervisor: true));
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byIcon(Icons.lock_open_rounded), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
   });
 
   test('chats list: pinned first then newest, search, live message updates the row and unread count', () async {

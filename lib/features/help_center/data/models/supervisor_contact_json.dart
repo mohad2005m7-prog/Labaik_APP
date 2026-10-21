@@ -2,8 +2,9 @@ import '../../../../core/utils/json_fields.dart';
 import '../../domain/entities/supervisor_contact.dart';
 
 // -------------------------------------------------------------
-// SupervisorDto من السيرفر (camelCase أو PascalCase):
-// { "id", "fullName", "phoneNumber", "photoUrl", "conversationId" }
+// SupervisorContactDto من السيرفر (GET /pilgrim/supervisor):
+// { "groupId", "groupName", "supervisorId", "fullName", "email", "phoneNumber", "photoUrl" }
+// (والكاش القديم على الجهاز: "id" بدل supervisorId)
 // -------------------------------------------------------------
 extension SupervisorContactJson on SupervisorContact {
   static SupervisorContact fromJson(Map<String, dynamic> json) {
@@ -13,7 +14,7 @@ extension SupervisorContactJson on SupervisorContact {
     }
 
     return SupervisorContact(
-      id: json.requireString('id'),
+      id: text('supervisorId') ?? json.requireString('id'),
       name: text('fullName') ?? text('name') ?? '',
       phone: text('phoneNumber') ?? text('phone'),
       photoUrl: text('photoUrl'),

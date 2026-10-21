@@ -1,5 +1,6 @@
 import '../../../../core/utils/geo_utils.dart';
 import '../entities/chat_message.dart';
+import '../entities/chat_room.dart';
 import '../entities/conversation_summary.dart';
 
 // -------------------------------------------------------------
@@ -31,6 +32,21 @@ abstract class ChatRepository {
 
   /// الرسائل الجديدة لحظة وصولها (SignalR) — [conversationId] = null: من كل المحادثات (للقائمة)
   Stream<ChatMessage> incoming([String? conversationId]);
+
+  /// صلاحياتي بالمحادثة (أكتب؟ مكتوم؟ مشرف؟ قراءة بس؟)
+  Future<ChatRoom> room(String conversationId);
+
+  /// حذف رسالة (صاحبها، أو مشرف المجموعة لأي رسالة بالمجموعة)
+  Future<void> deleteMessage(String conversationId, String messageId);
+
+  /// أرقام الرسائل المحذوفة لحظة حذفها (SignalR "MessageDeleted")
+  Stream<String> deletedMessages([String? conversationId]);
+
+  /// المشرف: كتم معتمر بالمجموعة [minutes] دقيقة (0 = فك الكتم، لحد 7 أيام)
+  Future<void> mute(String conversationId, String userId, {required int minutes});
+
+  /// المشرف: الكتابة بالمجموعة للمشرف بس
+  Future<void> setOnlySupervisorCanPost(String conversationId, bool value);
 
   /// الاتصال اللحظي شغّال؟ (لو لا، الشاشة بتتحدّث كل كم ثانية من الـ REST)
   bool get isLive;

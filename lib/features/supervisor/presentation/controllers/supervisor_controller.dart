@@ -9,9 +9,11 @@ import '../../../auth/data/token_refresher.dart';
 import '../../../auth/presentation/pages/auth_welcome_screen.dart';
 import '../../../group/data/sources/group_realtime.dart';
 import '../../../auth/presentation/pages/create_new_password_screen.dart';
+import '../../../chats/presentation/controllers/chats_controller.dart';
 import '../../domain/entities/announcement.dart';
 import '../../domain/entities/group_member.dart';
 import '../../domain/entities/supervisor_group.dart';
+import '../../domain/entities/supervisor_inbox.dart';
 import '../../domain/repositories/supervisor_repository.dart';
 import '../cubits/supervisor_content_cubits.dart';
 import '../pages/announcement_details_screen.dart';
@@ -62,6 +64,15 @@ class SupervisorController {
     var m = member;
     if (groupId != null) m = await context.read<SupervisorRepository>().getMember(groupId, member);
     if (context.mounted) _push(context, MemberDetailsScreen(member: m));
+  }
+
+  /// "تواصل" بصفحة المعتمر → محادثتنا الفردية (POST /chats/direct — السيرفر بيعملها أول مرة)
+  static Future<void> messageMember(BuildContext context, GroupMember member) => ChatsController.openDirect(context, userId: member.id, name: member.name, photoUrl: member.photo);
+
+  /// صف بقائمة الدردشات → المحادثة (مجموعة أو فردية)
+  static Future<void> openChat(BuildContext context, ChatThread thread) async {
+    await ChatsController.openRoom(context, id: thread.id, title: thread.name, isGroup: thread.isGroup, photoUrl: thread.photoUrl);
+    if (context.mounted) context.read<SupervisorChatsCubit>().load();
   }
 
   static void openAnnouncement(BuildContext context, Announcement announcement) => _push(context, AnnouncementDetailsScreen(announcement: announcement));

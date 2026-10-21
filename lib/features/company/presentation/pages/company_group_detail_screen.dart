@@ -149,7 +149,7 @@ class _CompanyGroupDetailScreenState extends State<CompanyGroupDetailScreen> {
           companyBox(c, left: 206, top: 419, width: 170.5, height: 73, color: CompanyColors.statCard, shadow: CompanyColors.greenShadow),
           c.image('assets/images/supervisor/ic_pen.png', left: 336, top: 444, width: 24, height: 24, color: green),
           FigmaLines.build(c, CompanyGroupsText.chat(), left: 208, top: 445, width: 120, style: c.style(14, FigmaWeight.semiBold, green), wrap: false),
-          c.tapArea(left: 206, top: 419, width: 170.5, height: 73, onTap: () => CompanyController.comingSoon(context)),
+          c.tapArea(left: 206, top: 419, width: 170.5, height: 73, onTap: () => CompanyController.openGroupChat(context, group)),
 
           // تغيير المشرف / إضافة المشرف + السهم
           companyBox(c, left: 19, top: 419, width: 170.5, height: 73, color: CompanyColors.statCard, shadow: CompanyColors.greenShadow),

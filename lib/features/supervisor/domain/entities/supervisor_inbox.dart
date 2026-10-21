@@ -34,8 +34,13 @@ class ChatThread extends Equatable {
   final String lastMessage;
   final String time;
 
-  const ChatThread({required this.id, required this.name, required this.lastMessage, required this.time});
+  /// مجموعة (وإلا محادثة فردية مع معتمر) — وصورة الطرف التاني وعدد غير المقروء
+  final bool isGroup;
+  final String? photoUrl;
+  final int unread;
+
+  const ChatThread({required this.id, required this.name, required this.lastMessage, required this.time, this.isGroup = true, this.photoUrl, this.unread = 0});
 
   @override
-  List<Object?> get props => [id, name, lastMessage, time];
+  List<Object?> get props => [id, name, lastMessage, time, isGroup, photoUrl, unread];
 }

@@ -14,7 +14,8 @@ import '../widgets/supervisor_widgets.dart';
 // -------------------------------------------------------------
 // الدردشات — مطابقة لـ Figma "الدردشات" (234:3541)
 // صفوف iOS (_Messages-threadRow) 361×76 كل 84: الصورة 45 يمين، الاسم والرسالة، الوقت والسهم يسار
-// البحث بيفلتر حسب اسم المجموعة أو آخر رسالة — المحادثة نفسها لسا ما انصممت ("قريباً")
+// البحث بيفلتر حسب الاسم أو آخر رسالة — مجموعاتي + المحادثات الفردية مع المعتمرين — الضغط بيفتح المحادثة
+// (بنفس شاشة محادثة المعتمر Figma 111:7045 — فيها حذف الرسائل وكتم المعتمر وقفل الكتابة للمشرف)
 // -------------------------------------------------------------
 class SupervisorChatsScreen extends StatelessWidget {
   const SupervisorChatsScreen({super.key});
@@ -67,7 +68,7 @@ class SupervisorChatsScreen extends StatelessWidget {
       c.text(t.lastMessage, left: 82, top: top + 30, width: 212, height: 20, dy: 0, style: secondary),
       // فاصل 0.5 تحت المحتوى (x16..294)
       c.box(left: 16, top: top + 75.5, width: 278, height: 0.5, color: SupColors.chatSeparator),
-      c.tapArea(left: 16, top: top, width: 361, height: 76, onTap: () => SupervisorController.comingSoon(context)),
+      c.tapArea(left: 16, top: top, width: 361, height: 76, onTap: () => SupervisorController.openChat(context, t)),
     ];
   }
 }

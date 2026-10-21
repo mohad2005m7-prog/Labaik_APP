@@ -3,8 +3,8 @@ import '../../domain/entities/conversation_summary.dart';
 import 'chat_message_json.dart';
 
 // -------------------------------------------------------------
-// ConversationDto من السيرفر (camelCase أو PascalCase):
-// { "id", "title", "photoUrl", "isGroup", "isPinned", "unreadCount", "lastMessage": MessageDto | null }
+// صف قائمة المحادثات بالكاش المحلي:
+// { "id", "title", "photoUrl", "isGroup", "isPinned", "unreadCount", "lastMessage": MessageDto | null, "otherUserId" }
 // -------------------------------------------------------------
 extension ConversationSummaryJson on ConversationSummary {
   static ConversationSummary fromJson(Map<String, dynamic> json, {String? myUserId}) {
@@ -22,9 +22,10 @@ extension ConversationSummaryJson on ConversationSummary {
       isPinned: json.field('isPinned') == true,
       unreadCount: json.optionalInt('unreadCount') ?? 0,
       lastMessage: last is Map<String, dynamic> ? ChatMessageJson.fromJson(last, myUserId: myUserId) : null,
+      otherUserId: text('otherUserId'),
     );
   }
 
   /// للكاش المحلي
-  Map<String, dynamic> toJson() => {'id': id, 'title': title, 'photoUrl': photoUrl, 'isGroup': isGroup, 'isPinned': isPinned, 'unreadCount': unreadCount, 'lastMessage': lastMessage?.toJson()};
+  Map<String, dynamic> toJson() => {'id': id, 'title': title, 'photoUrl': photoUrl, 'isGroup': isGroup, 'isPinned': isPinned, 'unreadCount': unreadCount, 'lastMessage': lastMessage?.toJson(), 'otherUserId': otherUserId};
 }

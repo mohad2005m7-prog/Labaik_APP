@@ -17,7 +17,21 @@ class HomeGroup {
   /// رسائل دردشة المجموعة غير المقروءة
   final int unreadMessages;
 
-  const HomeGroup({required this.id, required this.name, this.leaderName, this.memberCount = 0, this.isLeader = false, this.unreadAnnouncements = 0, this.unreadMessages = 0});
+  /// إعدادات دردشة المجموعة: المشرف بس بيكتب — و[mutedUntil] = أنا مكتوم لحد هالوقت (null = لأ)
+  final bool onlySupervisorCanPost;
+  final DateTime? mutedUntil;
+
+  const HomeGroup({
+    required this.id,
+    required this.name,
+    this.leaderName,
+    this.memberCount = 0,
+    this.isLeader = false,
+    this.unreadAnnouncements = 0,
+    this.unreadMessages = 0,
+    this.onlySupervisorCanPost = false,
+    this.mutedUntil,
+  });
 
   /// من جسم رد /home كله
   static HomeGroup? fromHome(Object? home) {
@@ -32,6 +46,8 @@ class HomeGroup {
       isLeader: group.optionalInt('myRole') == 1,
       unreadAnnouncements: group.optionalInt('unreadAnnouncements') ?? 0,
       unreadMessages: group.optionalInt('unreadMessages') ?? 0,
+      onlySupervisorCanPost: group.field('onlySupervisorCanPost') == true,
+      mutedUntil: DateTime.tryParse(group.field('myMutedUntilUtc')?.toString() ?? '')?.toLocal(),
     );
   }
 }

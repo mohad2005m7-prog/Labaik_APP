@@ -8,13 +8,14 @@ enum ChatMessageStatus { sending, sent, failed }
 // رسالة بمحادثة (مع المشرف، مع فرد، أو مجموعة): نص أو موقع (أو الاتنين)
 // [clientId]: رقم بيولّده التطبيق قبل الإرسال — بيربط الرسالة المؤقتة بنسختها من السيرفر (وما بتتكرر)
 // [id]: رقم السيرفر (أو clientId لحد ما توصل)
-// [senderName]/[senderPhotoUrl]: صاحب الرسالة (صورته بتطلع جنب الفقاعة — بالمجموعة كل واحد صورته)
+// [senderId]/[senderName]/[senderPhotoUrl]: صاحب الرسالة (صورته بتطلع جنب الفقاعة — بالمجموعة كل واحد صورته)
 // -------------------------------------------------------------
 class ChatMessage extends Equatable {
   final String id;
   final String clientId;
   final String? conversationId;
   final bool fromMe;
+  final String? senderId;
   final String? senderName;
   final String? senderPhotoUrl;
   final String? text;
@@ -28,6 +29,7 @@ class ChatMessage extends Equatable {
     required this.fromMe,
     required this.sentAt,
     this.conversationId,
+    this.senderId,
     this.senderName,
     this.senderPhotoUrl,
     this.text,
@@ -42,6 +44,7 @@ class ChatMessage extends Equatable {
     clientId: clientId,
     conversationId: conversationId,
     fromMe: fromMe,
+    senderId: senderId,
     senderName: senderName,
     senderPhotoUrl: senderPhotoUrl,
     text: text,
@@ -51,5 +54,5 @@ class ChatMessage extends Equatable {
   );
 
   @override
-  List<Object?> get props => [id, clientId, conversationId, fromMe, senderName, senderPhotoUrl, text, location?.latitude, location?.longitude, sentAt, status];
+  List<Object?> get props => [id, clientId, conversationId, fromMe, senderId, senderName, senderPhotoUrl, text, location?.latitude, location?.longitude, sentAt, status];
 }

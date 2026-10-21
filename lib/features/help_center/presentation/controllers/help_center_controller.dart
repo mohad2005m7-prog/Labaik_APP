@@ -101,18 +101,27 @@ class HelpCenterController {
     if (!opened && context.mounted) showMessage(context, HelpMessagesText.callFailed);
   }
 
-  static void toChat(BuildContext context, SupervisorContactState state) {
+  /// "مراسلة المشرف": محادثتي الفردية معه (POST /chats/direct — السيرفر بيعملها أول مرة)
+  static Future<void> toChat(BuildContext context, SupervisorContactState state) async {
     final contact = _supervisor(context, state);
     if (contact == null) return;
-    final conversationId = contact.conversationId;
+    final repo = ChatsController.chatRepository();
+    String? conversationId = contact.conversationId;
     if (conversationId == null) {
-      showMessage(context, HelpMessagesText.chatUnavailable);
-      return;
+      try {
+        conversationId = (await repo.startDirect(contact.id)).id;
+      } catch (_) {
+        await repo.dispose();
+        if (context.mounted) showMessage(context, HelpMessagesText.chatUnavailable);
+        return;
+      }
     }
-    _push(
+    if (!context.mounted) return;
+    final id = conversationId;
+    await _push(
       context,
       BlocProvider(
-        create: (_) => ConversationCubit(ChatsController.chatRepository(), conversationId)..start(),
+        create: (_) => ConversationCubit(repo, id)..start(),
         child: SupervisorChatScreen(supervisor: contact),
       ),
     );

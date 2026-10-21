@@ -53,11 +53,12 @@ class ChatBubble extends StatelessWidget {
   final Widget? child;
   final double opacity;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   /// الفقاعة بعرضها الكامل 267 (رسالة المشرف الأولى بـ Figma) بدل ما تلفّ على النص
   final bool fullWidth;
 
-  const ChatBubble({super.key, required this.s, required this.fromMe, required this.layout, this.avatar, this.text, this.child, this.opacity = 1, this.onTap, this.fullWidth = false});
+  const ChatBubble({super.key, required this.s, required this.fromMe, required this.layout, this.avatar, this.text, this.child, this.opacity = 1, this.onTap, this.onLongPress, this.fullWidth = false});
 
   static const maxWidth = 267.3;
   static const padX = 12.0;
@@ -72,6 +73,7 @@ class ChatBubble extends StatelessWidget {
     final content = child == null ? _text(context, style) : Directionality(textDirection: outer, child: child!);
     final bubble = GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Opacity(
         opacity: opacity,
         child: CustomPaint(

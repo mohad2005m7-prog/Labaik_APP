@@ -17,7 +17,4 @@ abstract final class ApiConfig {
 
   /// مواقع أفراد المجموعة لحظياً (LocationUpdated / StoppedSharing)
   static final locationHub = Uri.parse('wss://$host/hubs/location');
-
-  /// هَب المحادثات الفردية — لسا مش موجود على السيرفر (المحادثات الفردية مؤجلة بالاتفاق)
-  static final chatHub = Uri.parse('wss://$host/hubs/chat');
 }

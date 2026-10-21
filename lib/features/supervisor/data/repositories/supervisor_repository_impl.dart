@@ -1,5 +1,8 @@
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/utils/stream_merge.dart';
+import '../../../chats/data/repositories/server_chat_repository.dart';
 import '../../../chats/data/sources/group_chat_api.dart';
+import '../../../chats/domain/repositories/chat_repository.dart';
 import '../../../group/data/models/home_group.dart';
 import '../../../group/data/sources/group_api.dart';
 import '../../../group/data/sources/group_realtime.dart';
@@ -39,7 +42,9 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
     NotificationsApi? notifications,
     GroupChatApi? chat,
     SupervisorApi? supervisor,
+    ChatRepository? chats,
   }) : _supervisor = supervisor ?? SupervisorApi.server(),
+       _chatsOverride = chats,
        _local = local ?? SupervisorLocalSource(),
        _account = account ?? SupervisorAccountSource(),
        _groups = groups ?? GroupApi.server(),
@@ -54,6 +59,10 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
   final NotificationsApi _notifications;
   final GroupChatApi _chat;
   final SupervisorApi _supervisor;
+
+  /// الدردشات (مجموعاتي + المحادثات الفردية مع المعتمرين)
+  final ChatRepository? _chatsOverride;
+  late final ChatRepository _chatList = _chatsOverride ?? ServerChatRepository(groups: _groups, groupChat: _chat);
 
   /// رحلة كل مجموعة (للبرنامج)
   final _tripOf = <String, String>{};
@@ -192,17 +201,26 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
 
   @override
   Future<List<ChatThread>> getChats() async {
-    final group = await _myGroup();
-    if (group == null) return const [];
-    final last = (await _chat.messages(group.id, take: 1)).lastOrNull;
-    return [ChatThread(id: group.id, name: group.name, lastMessage: last?.text ?? '', time: last == null ? '' : SupFormat.chatTime(last.sentAt))];
+    final list = await _chatList.conversations();
+    return [
+      for (final c in list)
+        ChatThread(
+          id: c.id,
+          name: c.title,
+          lastMessage: c.lastMessage == null ? '' : (c.lastMessage!.isLocation ? '📍' : c.lastMessage!.text ?? ''),
+          time: c.lastMessage == null ? '' : SupFormat.chatTime(c.lastMessage!.sentAt),
+          isGroup: c.isGroup,
+          photoUrl: c.photoUrl,
+          unread: c.unreadCount,
+        ),
+    ];
   }
 
   @override
   Stream<void> notificationsChanged() => GroupRealtime.events.on('NotificationReceived').map((_) {});
 
   @override
-  Stream<void> chatsChanged() => GroupRealtime.events.on('MessageReceived').map((_) {});
+  Stream<void> chatsChanged() => mergeStreams([GroupRealtime.events.on('MessageReceived'), GroupRealtime.events.on('DirectMessageReceived'), GroupRealtime.events.on('MessageDeleted')]).map((_) {});
 
   @override
   Future<List<Announcement>> getAnnouncements() async {

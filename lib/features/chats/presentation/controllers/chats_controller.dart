@@ -5,8 +5,7 @@ import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/l10n/common_text.dart';
 import '../../../../core/l10n/tx.dart';
 import '../../../../core/utils/app_launcher.dart';
-import '../../data/repositories/chat_repository_impl.dart';
-import '../../data/repositories/group_chat_repository.dart';
+import '../../data/repositories/server_chat_repository.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/conversation_summary.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -18,16 +17,16 @@ import '../pages/conversation_screen.dart';
 
 // -------------------------------------------------------------
 // التنقل بالدردشات (بروتوتايب Figma): تبويب "الدردشات" → قائمة المحادثات → المحادثة
-// التبويب من السيرفر: محادثة مجموعتي (GroupChatRepository)
-// المحادثات الفردية (مع المشرف من مركز المساعدة، أو مع فرد) لسا مش موجودة بالسيرفر (مؤجلة بالاتفاق)
+// كله من السيرفر (ServerChatRepository): دردشة المجموعة + المحادثات الفردية بين المعتمر ومشرفه
+// المحادثة مع فرد من العائلة على الجهاز (LocalChatRepository) — السيرفر بيسمح بالفردية بين المعتمر ومشرفه بس
 // -------------------------------------------------------------
 class ChatsController {
   // مصادر البيانات — الاختبارات بتبدّلها
-  /// تبويب الدردشات: محادثة المجموعة
-  static ChatRepository Function() groupChats = GroupChatRepository.new;
+  /// تبويب الدردشات: المجموعة + الفردية
+  static ChatRepository Function() groupChats = ServerChatRepository.new;
 
-  /// المحادثات الفردية (/chats — docs/backend_pending.md)
-  static ChatRepository Function() chatRepository = ChatRepositoryImpl.new;
+  /// محادثة فردية (مع المشرف من مركز المساعدة، أو مع معتمر من صفحة المشرف)
+  static ChatRepository Function() chatRepository = ServerChatRepository.new;
 
   static void showMessage(BuildContext context, Tx text) {
     ScaffoldMessenger.of(context)
@@ -53,6 +52,23 @@ class ChatsController {
     );
     if (!list.isClosed) list.closed();
   }
+
+  /// فتح محادثة من أي مكان (قائمة دردشات المشرف، دردشة مجموعة الشركة قراءة بس) — [repository] null = السيرفر
+  static Future<void> openRoom(BuildContext context, {required String id, required String title, bool isGroup = false, String? photoUrl, ChatRepository? repository}) {
+    return Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (_) => ConversationCubit(repository ?? chatRepository(), id)..start(),
+          child: ConversationScreen(title: title, photoUrl: photoUrl, isGroup: isGroup),
+        ),
+      ),
+    );
+  }
+
+  /// دردشة مجموعة من حساب الشركة (قراءة بس)
+  static Future<void> openCompanyGroupChat(BuildContext context, {required String groupId, required String title}) =>
+      openRoom(context, id: groupId, title: title, isGroup: true, repository: ServerChatRepository.companyReader(groupId));
 
   /// محادثة فردية مع شخص (فرد من العائلة مثلاً): السيرفر بيرجّع محادثتنا (أو بينشئها) وبتنفتح
   /// [repository]: مصدر غير السيرفر (مثلاً المحادثات على الجهاز للأقسام المفصولة مؤقتاً عن السيرفر)

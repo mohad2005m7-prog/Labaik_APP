@@ -37,6 +37,9 @@ class ChatMessageList extends StatelessWidget {
   final ValueChanged<ChatMessage> onRetry;
   final ValueChanged<ChatMessage> onOpenLocation;
 
+  /// الضغط المطوّل على فقاعة (حذف / كتم) — null = ما في
+  final ValueChanged<ChatMessage>? onLongPress;
+
   const ChatMessageList({
     super.key,
     required this.s,
@@ -51,6 +54,7 @@ class ChatMessageList extends StatelessWidget {
     this.footer,
     this.myPhoto,
     this.otherPhotoUrl,
+    this.onLongPress,
   });
 
   static bool _sameSender(ChatMessage a, ChatMessage b) => a.fromMe == b.fromMe && (a.fromMe || a.senderName == b.senderName);
@@ -113,6 +117,7 @@ class ChatMessageList extends StatelessWidget {
           : message.isLocation
           ? () => onOpenLocation(message)
           : null,
+      onLongPress: onLongPress == null || failed ? null : () => onLongPress!(message),
       child: message.isLocation ? ChatLocationContent(s: s, location: message.location!, fromMe: message.fromMe, note: message.text) : null,
     );
     if (!failed) return bubble;

@@ -18,7 +18,10 @@ import '../widgets/supervisor_widgets.dart';
 class MemberDetailsScreen extends StatelessWidget {
   final GroupMember member;
 
-  const MemberDetailsScreen({super.key, required this.member});
+  /// "تواصل": المشرف → محادثة فردية مع المعتمر (الافتراضي) — الشركة بتمرّر طريقتها (إيميل)
+  final void Function(BuildContext context)? onContact;
+
+  const MemberDetailsScreen({super.key, required this.member, this.onContact});
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +45,7 @@ class MemberDetailsScreen extends StatelessWidget {
         ..._info(c, 411.5, MemberDetailsText.health, m.health),
         ..._info(c, 447, MemberDetailsText.notes, m.notes),
 
-        c.button(MemberDetailsText.contact(), left: 16, top: 524, onTap: () => SupervisorController.comingSoon(context)),
+        c.button(MemberDetailsText.contact(), left: 16, top: 524, onTap: () => onContact != null ? onContact!(context) : SupervisorController.messageMember(context, m)),
         ...supBackArrow(c, context, left: 19, top: 68, color: Colors.black),
       ],
     );

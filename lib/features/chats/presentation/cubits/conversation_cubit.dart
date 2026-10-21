@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/utils/geo_utils.dart';
 import '../../domain/entities/chat_message.dart';
+import '../../domain/entities/chat_room.dart';
 import '../../domain/repositories/chat_repository.dart';
 
 class ConversationState extends Equatable {
@@ -17,13 +18,22 @@ class ConversationState extends Equatable {
   /// جاري تحديد الموقع لإرساله
   final bool locating;
 
-  const ConversationState({this.messages = const [], this.error, this.locating = false});
+  /// صلاحياتي (أكتب؟ مكتوم؟ مشرف؟ قراءة بس؟) — قبل ما توصل: بنفترض بقدر أكتب
+  final ChatRoom room;
 
-  ConversationState copyWith({List<ChatMessage>? messages, Object? error, bool clearError = false, bool? locating}) =>
-      ConversationState(messages: messages ?? this.messages, error: clearError ? null : error ?? this.error, locating: locating ?? this.locating);
+  const ConversationState({this.messages = const [], this.error, this.locating = false, this.room = ChatRoom.direct});
+
+  ConversationState copyWith({List<ChatMessage>? messages, Object? error, bool clearError = false, bool? locating, ChatRoom? room}) =>
+      ConversationState(messages: messages ?? this.messages, error: clearError ? null : error ?? this.error, locating: locating ?? this.locating, room: room ?? this.room);
+
+  /// بقدر أحذف هالرسالة؟ (رسالتي، أو أنا مشرف المجموعة)
+  bool canDelete(ChatMessage m) => !room.readOnly && m.status == ChatMessageStatus.sent && room.isGroup && (m.fromMe || room.isSupervisor);
+
+  /// بقدر أكتم صاحبها؟ (المشرف لمعتمر بالمجموعة)
+  bool canMute(ChatMessage m) => room.isGroup && room.isSupervisor && !m.fromMe && m.senderId != null;
 
   @override
-  List<Object?> get props => [messages, error, locating];
+  List<Object?> get props => [messages, error, locating, room];
 }
 
 // -------------------------------------------------------------
@@ -31,6 +41,7 @@ class ConversationState extends Equatable {
 // - الرسائل المحفوظة بتطلع فوراً، وبعدين من السيرفر — وبتتعلّم كمقروءة
 // - الجديد بيوصل لحظياً (SignalR) — ولو الاتصال اللحظي مش شغّال بنحدّث كل 4 ثواني (وكل 20 ثانية كاحتياط لو شغّال)
 // - الإرسال بيطلع فوراً بالمحادثة ("جاري الإرسال") وبيتبدّل بنسخة السيرفر — ولو فشل بيضل "لم تُرسل" وبينضغط لإعادة المحاولة
+// - صلاحياتي (room) بتحدد الكتابة — والمحذوف (MessageDeleted) بيختفي فوراً — والمشرف بيحذف ويكتم ويقفل الكتابة
 // -------------------------------------------------------------
 class ConversationCubit extends Cubit<ConversationState> {
   final ChatRepository _repository;
@@ -40,6 +51,7 @@ class ConversationCubit extends Cubit<ConversationState> {
   ConversationCubit(this._repository, this.conversationId, {this.pollInterval = const Duration(seconds: 4)}) : super(const ConversationState());
 
   StreamSubscription<ChatMessage>? _live;
+  StreamSubscription<String>? _deleted;
   Timer? _poll;
   int _tick = 0;
   bool _fetching = false;
@@ -53,6 +65,8 @@ class ConversationCubit extends Cubit<ConversationState> {
       _merge([message]);
       if (!message.fromMe) _markRead();
     }, onError: (_) {});
+    _deleted = _repository.deletedMessages(conversationId).listen(_removeLocally, onError: (_) {});
+    unawaited(loadRoom());
     await refresh();
     if (isClosed) return;
     _markRead();
@@ -150,10 +164,41 @@ class ConversationCubit extends Cubit<ConversationState> {
 
   void setLocating(bool value) => emit(state.copyWith(locating: value));
 
+  /// صلاحياتي من السيرفر (لو فشل بنضل على الافتراضي)
+  Future<void> loadRoom() async {
+    try {
+      final room = await _repository.room(conversationId);
+      if (!isClosed) emit(state.copyWith(room: room));
+    } catch (_) {}
+  }
+
+  void _removeLocally(String messageId) {
+    if (isClosed || !state.messages.any((m) => m.id == messageId)) return;
+    final list = [for (final m in state.messages) if (m.id != messageId) m];
+    emit(state.copyWith(messages: list));
+    _repository.saveCache(conversationId, list);
+  }
+
+  /// حذف رسالة (بترمي الخطأ للشاشة) — بتختفي فوراً
+  Future<void> delete(ChatMessage message) async {
+    await _repository.deleteMessage(conversationId, message.id);
+    _removeLocally(message.id);
+  }
+
+  /// المشرف: كتم صاحب الرسالة [minutes] دقيقة (0 = فك)
+  Future<void> mute(ChatMessage message, {required int minutes}) => _repository.mute(conversationId, message.senderId!, minutes: minutes);
+
+  /// المشرف: الكتابة للمشرف بس / للكل
+  Future<void> setOnlySupervisorCanPost(bool value) async {
+    await _repository.setOnlySupervisorCanPost(conversationId, value);
+    if (!isClosed) emit(state.copyWith(room: state.room.copyWith(onlySupervisorCanPost: value)));
+  }
+
   @override
   Future<void> close() async {
     _poll?.cancel();
     await _live?.cancel();
+    await _deleted?.cancel();
     await _repository.dispose();
     return super.close();
   }

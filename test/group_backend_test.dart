@@ -12,7 +12,8 @@ import 'package:labaik/core/utils/token_storage.dart';
 import 'package:labaik/features/auth/data/account_registry.dart';
 import 'package:labaik/features/auth/data/auth_session.dart';
 import 'package:labaik/features/auth/data/models/account_type.dart';
-import 'package:labaik/features/chats/data/repositories/group_chat_repository.dart';
+import 'package:labaik/features/chats/data/repositories/server_chat_repository.dart';
+import 'package:labaik/features/chats/data/sources/chat_api.dart';
 import 'package:labaik/features/chats/data/sources/group_chat_api.dart';
 import 'package:labaik/features/family/domain/entities/family_member.dart';
 import 'package:labaik/features/group/data/sources/group_api.dart';
@@ -101,7 +102,7 @@ void main() {
     expect(await none.myGroup(), isNull);
   });
 
-  test('group chat: the group is the conversation, history is oldest→newest, send posts {body}, live messages are filtered by group', () async {
+  test('server chats: the group is the conversation (no /chats on this server), history is oldest→newest, send posts {body}, live messages are filtered by group', () async {
     final hubEvents = StreamController<List<Object?>>.broadcast();
     GroupRealtime.events = _FakeHub(hubEvents.stream);
     final server = FakeServer({
@@ -121,7 +122,7 @@ void main() {
           ),
     });
     final client = server.client();
-    final repo = GroupChatRepository(groups: GroupApi(client), api: GroupChatApi(client));
+    final repo = ServerChatRepository(groups: GroupApi(client), groupChat: GroupChatApi(client), direct: ChatApi(client));
 
     final list = await repo.conversations();
     expect(list.single.id, 'g1');
@@ -141,8 +142,11 @@ void main() {
     expect(saved.id, 'm3');
     expect(saved.clientId, 'c1');
     expect(saved.fromMe, isTrue);
-    // رسائل الموقع مش مدعومة بدردشة المجموعة
-    expect(() => repo.send('g1', clientId: 'c2', location: const GeoPoint(21.4, 39.8)), throwsA(isA<ApiException>()));
+    // رسالة موقع بالمجموعة: kind 2 مع الإحداثيات
+    await repo.send('g1', clientId: 'c2', location: const GeoPoint(21.4, 39.8));
+    expect(jsonDecode(server.requests.last.body), {'body': '', 'kind': 2, 'latitude': 21.4, 'longitude': 39.8});
+    // نص فاضي بلا موقع ما بينبعت
+    expect(() => repo.send('g1', clientId: 'c3', text: '  '), throwsA(isA<ApiException>()));
 
     final live = <String>[];
     final sub = repo.incoming('g1').listen((m) => live.add(m.id));
@@ -156,6 +160,58 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(live, ['m4']);
     await sub.cancel();
+  });
+
+  test('server chats: group + direct in one list, routing by conversation, DirectMessageReceived, group room from /home?groupId', () async {
+    final hub = StreamController<List<Object?>>.broadcast();
+    GroupRealtime.events = _FakeHub(hub.stream);
+    final server = FakeServer({
+      'GET /home': (r) => r.url.queryParameters['groupId'] == 'c1'
+          ? _home()
+          : _home(group: {..._group, 'myRole': 1, 'onlySupervisorCanPost': true, 'myMutedUntilUtc': null}),
+      'GET /groups/g1/messages': (_) => [],
+      'GET /chats': (_) => [
+            {'id': 'c1', 'otherUserId': 's9', 'otherName': 'أبو أحمد', 'lastMessage': 'أهلاً', 'lastMessageAtUtc': '2026-10-21T09:00:00Z', 'unreadCount': 1},
+          ],
+      'GET /chats/c1/messages': (_) => [
+            {'id': 'd1', 'conversationId': 'c1', 'senderId': 's9', 'body': 'أهلاً', 'sentAtUtc': '2026-10-21T09:00:00Z', 'isRead': false},
+          ],
+      'POST /chats/c1/messages': (r) => http.Response(
+            jsonEncode({'id': 'd2', 'conversationId': 'c1', 'senderId': 'me', 'body': (jsonDecode(r.body) as Map)['body'], 'sentAtUtc': '2026-10-21T09:01:00Z', 'isRead': false}),
+            201,
+            headers: {'content-type': 'application/json'},
+          ),
+      'POST /chats/c1/messages/read': (_) => null,
+    });
+    final client = server.client();
+    final repo = ServerChatRepository(groups: GroupApi(client), groupChat: GroupChatApi(client), direct: ChatApi(client));
+
+    final list = await repo.conversations();
+    expect(list.map((c) => (c.id, c.isGroup, c.title)), [('g1', true, 'حملة النور'), ('c1', false, 'أبو أحمد')]);
+    expect((await repo.fetch('c1')).single.id, 'd1');
+    await repo.send('c1', clientId: 'x', text: 'وصلت');
+    expect(server.requests.last.url.path, '/api/v1/chats/c1/messages');
+    await repo.markRead('c1');
+    expect(server.requests.last.url.path, '/api/v1/chats/c1/messages/read');
+
+    final room = await repo.room('g1');
+    expect((room.isGroup, room.isSupervisor, room.onlySupervisorCanPost), (true, true, true));
+    expect((await repo.room('c1')).isGroup, isFalse);
+
+    final live = <String>[];
+    final sub = repo.incoming('c1').listen((m) => live.add(m.id));
+    await Future<void>.delayed(Duration.zero);
+    hub.add([
+      {'id': 'd3', 'conversationId': 'c1', 'senderId': 's9', 'body': 'تمام', 'sentAtUtc': '2026-10-21T09:02:00Z', 'isRead': false},
+    ]);
+    await Future<void>.delayed(Duration.zero);
+    expect(live, contains('d3'));
+    await sub.cancel();
+
+    // الشركة: قراءة بس — بلا إرسال
+    final reader = ServerChatRepository(groups: GroupApi(client), groupChat: GroupChatApi(client), direct: ChatApi(client), companyGroupId: 'g1');
+    expect((await reader.room('g1')).readOnly, isTrue);
+    expect(() => reader.send('g1', clientId: 'y', text: 'x'), throwsA(isA<ApiException>()));
   });
 
   test('location sharing: PUT /location/sharing then POST /location with the position', () async {

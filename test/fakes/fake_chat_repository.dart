@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:labaik/core/network/api_exception.dart';
 import 'package:labaik/core/utils/geo_utils.dart';
 import 'package:labaik/features/chats/domain/entities/chat_message.dart';
+import 'package:labaik/features/chats/domain/entities/chat_room.dart';
 import 'package:labaik/features/chats/domain/entities/conversation_summary.dart';
 import 'package:labaik/features/chats/domain/repositories/chat_repository.dart';
 
@@ -21,6 +22,11 @@ class FakeChat implements ChatRepository {
   List<ConversationSummary> list = [];
   List<ChatMessage> server = [];
   bool failSend = false;
+  ChatRoom roomValue = ChatRoom.direct;
+  final deletedIds = <String>[];
+  final mutes = <(String, int)>[];
+  final locks = <bool>[];
+  final deletions = StreamController<String>.broadcast();
 
   @override
   Future<List<ConversationSummary>> conversations() async => list;
@@ -39,6 +45,21 @@ class FakeChat implements ChatRepository {
     sent.add((conversationId: conversationId, clientId: clientId, text: text, location: location));
     return ChatMessage(id: 's${sent.length}', clientId: clientId, conversationId: conversationId, fromMe: true, text: text, location: location, sentAt: DateTime.now());
   }
+
+  @override
+  Future<ChatRoom> room(String conversationId) async => roomValue;
+
+  @override
+  Future<void> deleteMessage(String conversationId, String messageId) async => deletedIds.add(messageId);
+
+  @override
+  Stream<String> deletedMessages([String? conversationId]) => deletions.stream;
+
+  @override
+  Future<void> mute(String conversationId, String userId, {required int minutes}) async => mutes.add((userId, minutes));
+
+  @override
+  Future<void> setOnlySupervisorCanPost(String conversationId, bool value) async => locks.add(value);
 
   @override
   Future<void> markRead(String conversationId) async => read.add(conversationId);

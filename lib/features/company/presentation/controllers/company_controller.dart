@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/l10n/common_text.dart';
@@ -8,6 +9,7 @@ import '../../../auth/data/auth_session.dart';
 import '../../../auth/data/token_refresher.dart';
 import '../../../auth/presentation/pages/auth_welcome_screen.dart';
 import '../../../auth/presentation/pages/create_new_password_screen.dart';
+import '../../../chats/presentation/controllers/chats_controller.dart';
 import '../../../family/presentation/controllers/family_controller.dart';
 import '../../../group/data/sources/group_realtime.dart';
 import '../../../group/presentation/controllers/group_controller.dart';
@@ -185,10 +187,21 @@ abstract final class CompanyController {
       MaterialPageRoute(
         builder: (_) => MemberDetailsScreen(
           member: GroupMember(id: m.userId, name: m.name, photo: m.photoUrl, present: m.present, number: m.number, email: m.email, nationality: m.nationality, health: m.healthNotes, notes: m.notes),
+          // الشركة ما إلها دردشة فردية (السيرفر: بين المعتمر ومشرفه بس) → إيميل المعتمر
+          onContact: (ctx) => _emailMember(ctx, m.email),
         ),
       ),
     );
   }
+
+  static Future<void> _emailMember(BuildContext context, String? email) async {
+    if (email == null || email.trim().isEmpty) return showMessage(context, CompanyFormsText.noEmail());
+    final opened = await launchUrl(Uri(scheme: 'mailto', path: email.trim()));
+    if (!opened && context.mounted) showMessage(context, email.trim());
+  }
+
+  /// "رؤية الدردشة" بتفاصيل المجموعة → دردشة المجموعة (قراءة بس)
+  static Future<void> openGroupChat(BuildContext context, CompanyGroup group) => ChatsController.openCompanyGroupChat(context, groupId: group.id, title: group.name);
 
   // ───────── المشرفين ─────────
 

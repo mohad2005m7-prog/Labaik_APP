@@ -12,6 +12,8 @@ import 'group_realtime.dart';
 // -------------------------------------------------------------
 // طلبات المجموعة لسيرفر لبيك (تحت /api/v1 — بـ Bearer token):
 //   GET /home                        → "group": مجموعتي (null = الشركة لسا ما ضافتني لمجموعة)
+//   GET /home?groupId=               → نفس "group" بس لمجموعة محددة من مجموعاتي (المشرف عنده أكتر من وحدة)
+//   GET /supervisor/groups           → المجموعات اللي بشرف عليها (للمشرف)
 //   GET /groups/{groupId}/locations  → كل الأعضاء (المشرف أول)، والإحداثيات لمن بيشارك بس
 // نقاط /groups/{groupId} للأعضاء بس — غير العضو بياخد 404
 // -------------------------------------------------------------
@@ -29,6 +31,19 @@ class GroupApi {
     final group = HomeGroup.fromHome(await _client.getJson('/home'));
     await GroupRealtime.groupSeen(group?.id);
     return group;
+  }
+
+  /// مجموعة محددة من مجموعاتي (دوري فيها وإعدادات دردشتها) — من غير ما نغيّر "مجموعتي" بالاتصال اللحظي
+  Future<HomeGroup?> group(String groupId) async => HomeGroup.fromHome(await _client.getJson('/home', query: {'groupId': groupId}));
+
+  /// المجموعات اللي بشرف عليها (رقمها واسمها) — للمشرف بس (غيره 403)
+  Future<List<({String id, String name})>> supervisedGroups() async {
+    final data = await _client.getJson('/supervisor/groups');
+    if (data is! List) return const [];
+    return [
+      for (final g in data.whereType<Map<String, dynamic>>())
+        if (g['id'] != null) (id: g['id'].toString(), name: g['name']?.toString() ?? ''),
+    ];
   }
 
   /// "تأكد من مجموعتك": GET /groups/{code} → GroupSummaryDto (رمز غلط = 404)

@@ -1,5 +1,6 @@
 import '../../../../core/utils/geo_utils.dart';
 import '../../domain/entities/chat_message.dart';
+import '../../domain/entities/chat_room.dart';
 import '../../domain/entities/conversation_summary.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../sources/chat_local_source.dart';
@@ -46,6 +47,21 @@ class LocalChatRepository implements ChatRepository {
 
   @override
   Future<ConversationSummary> startDirect(String userId) async => ConversationSummary(id: conversationFor(userId), title: '');
+
+  @override
+  Future<ChatRoom> room(String conversationId) async => ChatRoom.direct;
+
+  @override
+  Future<void> deleteMessage(String conversationId, String messageId) async {}
+
+  @override
+  Stream<String> deletedMessages([String? conversationId]) => const Stream.empty();
+
+  @override
+  Future<void> mute(String conversationId, String userId, {required int minutes}) async {}
+
+  @override
+  Future<void> setOnlySupervisorCanPost(String conversationId, bool value) async {}
 
   @override
   Future<void> markRead(String conversationId) async {}
