@@ -3,12 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/l10n/common_text.dart';
 import '../../../../core/l10n/tx.dart';
-import '../../../../core/utils/token_storage.dart';
-import '../../../auth/data/auth_session.dart';
-import '../../../auth/data/token_refresher.dart';
+import '../../../../core/widgets/busy_overlay.dart';
 import '../../../auth/presentation/pages/auth_welcome_screen.dart';
-import '../../../group/data/sources/group_realtime.dart';
 import '../../../auth/presentation/pages/create_new_password_screen.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../chats/presentation/controllers/chats_controller.dart';
 import '../../domain/entities/announcement.dart';
 import '../../domain/entities/group_member.dart';
@@ -61,9 +59,9 @@ class SupervisorController {
 
   /// صفحة العضو — بنجيب بطاقته الكاملة (الملاحظات الصحية) من السيرفر لو عرفنا مجموعته
   static Future<void> openMember(BuildContext context, GroupMember member, {String? groupId}) async {
-    var m = member;
-    if (groupId != null) m = await context.read<SupervisorRepository>().getMember(groupId, member);
-    if (context.mounted) _push(context, MemberDetailsScreen(member: m));
+    final repository = context.read<SupervisorRepository>();
+    final m = groupId == null ? member : await BusyOverlay.run(context, () => repository.getMember(groupId, member));
+    if (m != null && context.mounted) _push(context, MemberDetailsScreen(member: m));
   }
 
   /// "تواصل" بصفحة المعتمر → محادثتنا الفردية (POST /chats/direct — السيرفر بيعملها أول مرة)
@@ -91,12 +89,7 @@ class SupervisorController {
 
   /// "تسجيل الخروج": حذف التوكن وبيانات المشرف المحفوظة والرجوع لشاشة الدخول/إنشاء الحساب
   static Future<void> logout(BuildContext context) async {
-    final repository = context.read<SupervisorRepository>();
-    await TokenRefresher.revoke();
-    await TokenStorage.clearTokens();
-    await AuthSession.clear();
-    GroupRealtime.reset();
-    await repository.clear();
+    await AuthController.endSession();
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const AuthWelcomeScreen()),

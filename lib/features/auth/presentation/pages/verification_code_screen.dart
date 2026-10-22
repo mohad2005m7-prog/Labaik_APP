@@ -76,7 +76,7 @@ class _VerificationCodeScreenState extends State<VerificationCodeScreen> {
   }
 
   void _resend() {
-    AuthController.resendCode(context, widget.email);
+    AuthController.resendCode(context, widget.email, isPasswordReset: widget.isPasswordReset);
     _startTimer();
   }
 

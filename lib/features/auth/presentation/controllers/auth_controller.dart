@@ -61,6 +61,8 @@ class AuthController {
       await AuthSession.clear();
       return null;
     }
+    // أي واجهة بيفوت عليها → بنسمع لو انوقف حسابه (خروج فوري)
+    GroupRealtime.watchAccount();
     switch (account?.setup) {
       case AccountSetup.tripSetup:
         return const TripTypeScreen();
@@ -224,8 +226,9 @@ class AuthController {
   }) async {
     // استعادة كلمة المرور: الرمز رمز استعادة (مش تأكيد بريد) — بيتحقق منه reset-password نفسه
     // (كان بينبعت لـ verify-email فالسيرفر يرفضه دايماً وما حدا يقدر يغيّر كلمته)
+    // push (مش replace): لو الرمز طلع غلط بنرجع لشاشة الرمز نفسها (مش لشاشة الإيميل) يصلّحه أو يطلب جديد
     if (isPasswordReset) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => CreateNewPasswordScreen(email: email, code: code)));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => CreateNewPasswordScreen(email: email, code: code)));
       return;
     }
     setLoading(true);
@@ -236,39 +239,30 @@ class AuthController {
       if (!context.mounted) return;
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        if (isPasswordReset) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CreateNewPasswordScreen(email: email, code: code),
-            ),
-          );
-        } else {
-          // تسجيل حساب جديد: نحفظ التوكن (تسجيل دخول تلقائي بالخلفية)
-          // ثم نبدأ سلسلة إعداد الحساب (نوع الحساب -> نوع الرحلة -> ... -> الرئيسية)
-          final tokens = TokenStorage.extractTokens(response.body);
-          await TokenStorage.saveTokens(
-            accessToken: tokens['accessToken'],
-            refreshToken: tokens['refreshToken'],
-          );
-          await AuthSession.saveFromResponse(response.body);
-          // حساب جديد → بينضاف للحسابات المسجلة، ونوع الحساب اللي رح يختاره بينحفظ إله
-          await AccountRegistry.registered(email);
+        // تسجيل حساب جديد: نحفظ التوكن (تسجيل دخول تلقائي بالخلفية)
+        // ثم نبدأ سلسلة إعداد الحساب (نوع الحساب -> نوع الرحلة -> ... -> الرئيسية)
+        final tokens = TokenStorage.extractTokens(response.body);
+        await TokenStorage.saveTokens(
+          accessToken: tokens['accessToken'],
+          refreshToken: tokens['refreshToken'],
+        );
+        await AuthSession.saveFromResponse(response.body);
+        // حساب جديد → بينضاف للحسابات المسجلة، ونوع الحساب اللي رح يختاره بينحفظ إله
+        await AccountRegistry.registered(email);
 
-          if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(AuthMessagesText.accountVerified())),
-          );
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AuthMessagesText.accountVerified())),
+        );
 
-          // الحاج بس بيسجّل → إعداد رحلته مباشرة (ما في "نوع الحساب")
-          final home = await homeScreen() ?? const TripTypeScreen();
-          if (!context.mounted) return;
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => home),
-            (route) => false,
-          );
-        }
+        // الحاج بس بيسجّل → إعداد رحلته مباشرة (ما في "نوع الحساب")
+        final home = await homeScreen() ?? const TripTypeScreen();
+        if (!context.mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => home),
+          (route) => false,
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AuthMessagesText.invalidCode())),
@@ -283,10 +277,10 @@ class AuthController {
     }
   }
 
-  // 4. إعادة إرسال الرمز
-  static Future<void> resendCode(BuildContext context, String email) async {
+  // 4. إعادة إرسال الرمز — [isPasswordReset]: رمز نسيت كلمة المرور من جديد (resend-code بيبعت رمز تأكيد الإيميل بس)
+  static Future<void> resendCode(BuildContext context, String email, {bool isPasswordReset = false}) async {
     try {
-      final response = await AuthApiService.resendCode(email: email);
+      final response = isPasswordReset ? await AuthApiService.forgotPassword(email: email) : await AuthApiService.resendCode(email: email);
       if (!context.mounted) return;
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -383,9 +377,7 @@ class AuthController {
 
   /// خروج بدون ما يكمّل (من شاشة تغيير كلمة المرور الإجباري)
   static Future<void> signOutToWelcome(BuildContext context) async {
-    await TokenRefresher.revoke();
-    await TokenStorage.clearTokens();
-    await AuthSession.clear();
+    await endSession();
     if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const AuthWelcomeScreen()), (route) => false);
   }
@@ -409,6 +401,9 @@ class AuthController {
       if (!context.mounted) return;
 
       if (response.statusCode == 200) {
+        // لو كان داخل (تغيير كلمة المرور ← نسيتها): السيرفر لغى جلساته — بنطلّعه نظيف قبل شاشة الدخول
+        if (await TokenStorage.getAccessToken() != null) await endSession(revoke: false);
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AuthMessagesText.passwordChanged())),
         );
@@ -441,6 +436,19 @@ class AuthController {
   /// رسالة مفهومة بدل نص الخطأ التقني (بلا نت، مهلة، أو غيره)
   static String _failure(Object e) => e is SocketException || e is TimeoutException || e is http.ClientException || e is HandshakeException ? ApiErrorText.offline() : ApiErrorText.failed();
 
+  /// كل خروج بيمر من هون (يدوي من أي واجهة، أو الجلسة انتهت): بيوقف مشاركة الموقع، بيلغي الجلسة بالسيرفر
+  /// ([revoke] = false لما السيرفر نفسه لغاها)، بيمسح التوكنات وبيانات المشرف المحفوظة (ما تطلع للحساب الجاي)
+  /// وبيسكّر الاتصال اللحظي للحساب
+  static Future<void> endSession({bool revoke = true}) async {
+    await FamilyController.stopLocationSharing();
+    await GroupController.stopLocationSharing();
+    if (revoke) await TokenRefresher.revoke();
+    await TokenStorage.clearTokens();
+    await AuthSession.clear();
+    await SupervisorLocalSource().clear();
+    GroupRealtime.reset();
+  }
+
   /// الجلسة انتهت من السيرفر (SessionEvents): لازم يغيّر كلمة المرور → الشاشة الإجبارية
   /// غير هيك (انلغت الجلسة، المشرف موقوف، الحساب معطّل، الشركة موقوفة) → شاشة الدخول مع السبب
   static Future<void> onSessionEnded(String? code) async {
@@ -450,11 +458,7 @@ class AuthController {
       navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const CreateNewPasswordScreen.change(forced: true)), (route) => false);
       return;
     }
-    await FamilyController.stopLocationSharing();
-    await GroupController.stopLocationSharing();
-    await TokenStorage.clearTokens();
-    await AuthSession.clear();
-    GroupRealtime.reset();
+    await endSession(revoke: false);
     navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
     final message = ApiErrorText.forCode(code) ?? ApiErrorText.sessionEnded;
     WidgetsBinding.instance.addPostFrameCallback((_) {

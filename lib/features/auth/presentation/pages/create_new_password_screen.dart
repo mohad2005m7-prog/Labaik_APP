@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/figma_text.dart';
+import '../../../../core/utils/password_rules.dart';
 import '../controllers/auth_controller.dart';
 import '../l10n/new_password_text.dart';
 import '../widgets/auth_icons.dart';
@@ -41,9 +42,6 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
   final _confirm = TextEditingController();
   bool _loading = false;
 
-  // 8 أحرف على الأقل، رقم، وحرف كبير
-  static final _strong = RegExp(r'^(?=.*[0-9])(?=.*[A-Z]).{8,}$');
-
   @override
   void dispose() {
     for (final c in [_current, _newPassword, _confirm]) {
@@ -59,7 +57,7 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
         ? NewPasswordText.enterCurrentPassword()
         : _newPassword.text.isEmpty
         ? NewPasswordText.enterNewPassword()
-        : !_strong.hasMatch(_newPassword.text)
+        : !PasswordRules.isStrong(_newPassword.text)
             ? NewPasswordText.weakPassword()
             : _confirm.text.isEmpty
                 ? NewPasswordText.enterConfirmPassword()

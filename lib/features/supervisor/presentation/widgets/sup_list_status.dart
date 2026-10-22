@@ -11,6 +11,7 @@ abstract final class SupListStatusText {
   static const noChats = Tx('لا توجد محادثات بعد', 'No chats yet');
   static const noNotifications = Tx('لا توجد إشعارات بعد', 'No notifications yet');
   static const noAnnouncements = Tx('لا توجد إعلانات سابقة', 'No previous announcements');
+  static const noMembers = Tx('لا يوجد معتمرون هنا', 'No pilgrims here');
 }
 
 // -------------------------------------------------------------

@@ -4,15 +4,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/l10n/common_text.dart';
-import '../../../../core/utils/token_storage.dart';
-import '../../../auth/data/auth_session.dart';
-import '../../../auth/data/token_refresher.dart';
 import '../../../auth/presentation/pages/auth_welcome_screen.dart';
 import '../../../auth/presentation/pages/create_new_password_screen.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../chats/presentation/controllers/chats_controller.dart';
-import '../../../family/presentation/controllers/family_controller.dart';
-import '../../../group/data/sources/group_realtime.dart';
-import '../../../group/presentation/controllers/group_controller.dart';
 import '../../../supervisor/domain/entities/group_member.dart';
 import '../../../supervisor/presentation/pages/member_details_screen.dart';
 import '../../../terms/presentation/controllers/terms_controller.dart';
@@ -297,12 +292,7 @@ abstract final class CompanyController {
 
   /// تسجيل الخروج (نفس نمط PilgrimAccountController.logout)
   static Future<void> logout(BuildContext context) async {
-    await FamilyController.stopLocationSharing();
-    await GroupController.stopLocationSharing();
-    await TokenRefresher.revoke();
-    await TokenStorage.clearTokens();
-    await AuthSession.clear();
-    GroupRealtime.reset();
+    await AuthController.endSession();
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const AuthWelcomeScreen()), (route) => false);
   }

@@ -8,7 +8,9 @@ abstract final class GroupMembersText {
   static String tabAbsent(Object n) => tr('($n) غير حاضر', 'Absent ($n)');
   static const search = Tx('ابحث عن الاسم أو الرقم', 'Search by name or number');
 
-  // التحكم بالمعتمرين (مش بـ Figma): إضافة بالإيميل، والضغط المطوّل → إزالة
+  // التحكم بالمعتمرين (مش بـ Figma): إضافة بالإيميل، والضغط المطوّل → تسجيل الحضور أو إزالة
+  static const markPresent = Tx('تسجيل حاضر', 'Mark present');
+  static const markAbsent = Tx('تسجيل غير حاضر', 'Mark absent');
   static const add = Tx('إضافة عضو', 'Add Member');
   static String removeConfirm(Object name) => tr('إزالة $name من المجموعة؟', 'Remove $name from the group?');
   static const remove = Tx('إزالة', 'Remove');

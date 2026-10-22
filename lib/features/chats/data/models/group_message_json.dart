@@ -5,10 +5,13 @@ import '../../domain/entities/chat_message.dart';
 // -------------------------------------------------------------
 // رسالة دردشة المجموعة من السيرفر (ChatMessageDto) — من REST أو من حدث "MessageReceived":
 // { "id", "groupId", "senderId", "senderName", "senderPhotoUrl"?, "body" (حتى 2000 حرف), "sentAtUtc" (ISO 8601 UTC),
-//   "kind" (1 نص | 2 موقع), "latitude"?, "longitude"? }
+//   "kind" (1 نص | 2 موقع), "latitude"?, "longitude"?, "isDeleted" }
+// المحذوفة (المشرف أو كاتبها حذفها) بترجع من السيرفر بـ body فاضي — ما بنعرضها (بدل فقاعة فاضية)
 // المحادثة = المجموعة نفسها (conversationId = groupId) — ورسالتي = senderId هو رقمي
 // -------------------------------------------------------------
 abstract final class GroupMessageJson {
+  static bool isDeleted(Map<String, dynamic> json) => json.field('isDeleted') == true;
+
   static ChatMessage fromJson(Map<String, dynamic> json, {String? myUserId}) {
     final id = json.requireString('id');
     final senderId = json.field('senderId')?.toString();

@@ -9,6 +9,7 @@ import '../cubits/company_groups_cubit.dart';
 import '../cubits/company_home_cubit.dart';
 import '../cubits/company_profile_cubit.dart';
 import '../cubits/company_trips_cubit.dart';
+import '../widgets/company_colors.dart';
 import '../widgets/company_tab_bar.dart';
 import 'company_groups_screen.dart';
 import 'company_home_screen.dart';
@@ -106,7 +107,18 @@ class _CompanyShellState extends State<CompanyShell> {
                   ],
                 ),
               ),
-              Positioned.fill(child: SafeArea(child: Stack(clipBehavior: Clip.none, children: [CompanyTabBar(c: c, selected: _tab, onTab: _select)]))),
+              // الشريط مثبّت بأسفل الشاشة (فوق أزرار أندرويد / شريط الآيفون) بدل مكانه بإطار Figma —
+              // على شاشات 16:9 كان ينزل تحت أزرار النظام وما ينضغط
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: c.s.y(CompanyTabBar.height) + MediaQuery.paddingOf(context).bottom,
+                child: ColoredBox(
+                  color: CompanyColors.navFill,
+                  child: Stack(clipBehavior: Clip.none, children: [CompanyTabBar(c: c.at(CompanyTabBar.top), selected: _tab, onTab: _select)]),
+                ),
+              ),
             ],
           ),
         ),

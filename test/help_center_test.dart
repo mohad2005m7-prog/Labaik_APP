@@ -82,12 +82,10 @@ void main() {
       expect(sup, supervisor);
       expect(requests.single.headers['Authorization'], 'Bearer tok');
 
-      await api.submitLostChild(const LostChildReport(age: 7, description: 'قميص أحمر', location: GeoPoint(21.4, 39.8)), shareWithNearby: true);
-      final form = utf8.decode(requests.last.bodyBytes);
-      expect(requests.last.headers['content-type'], startsWith('multipart/form-data'));
-      for (final field in ['approxAge', 'قميص أحمر', 'latitude', 'shareWithNearby']) {
-        expect(form, contains(field));
-      }
+      // نفس عقد السيرفر (ReportLostChildCommand): JSON، والصورة رابط من POST /files
+      await api.submitLostChild(const LostChildReport(age: 7, description: ' قميص أحمر ', location: GeoPoint(21.4, 39.8)), shareWithNearby: true);
+      expect(requests.last.headers['content-type'], startsWith('application/json'));
+      expect(jsonDecode(requests.last.body), {'approxAge': 7, 'description': 'قميص أحمر', 'latitude': 21.4, 'longitude': 39.8, 'shareWithNearby': true});
     });
 
     test('expired token is renewed once, missing endpoint → isMissingOnServer, no connection → isOffline', () async {

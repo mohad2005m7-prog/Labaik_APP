@@ -33,7 +33,7 @@ class GroupChatApi {
     });
     if (data is! List) return const [];
     final me = await AuthSession.userId();
-    return [for (final item in data.whereType<Map<String, dynamic>>()) GroupMessageJson.fromJson(item, myUserId: me)].reversed.toList();
+    return [for (final item in data.whereType<Map<String, dynamic>>()) if (!GroupMessageJson.isDeleted(item)) GroupMessageJson.fromJson(item, myUserId: me)].reversed.toList();
   }
 
   /// كل الرسائل لحد هلق صارت مقروءة إلي (POST /groups/{id}/messages/read → 204)

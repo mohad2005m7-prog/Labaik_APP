@@ -146,6 +146,39 @@ void main() {
     expect((await again.getAnnouncements()).single.type, AnnouncementType.important);
   });
 
+  test('announcements with two groups: listed from both (newest first), sent to the picked group or to all of them', () async {
+    final now = DateTime.now().toUtc();
+    Map<String, dynamic> ann(String id, String group, Duration ago) =>
+        {'id': id, 'groupId': group, 'title': id, 'body': id, 'authorId': 'lead', 'createdAtUtc': now.subtract(ago).toIso8601String(), 'isRead': true};
+    http.Response created(http.Request r, String group) => http.Response(
+          jsonEncode({...(jsonDecode(r.body) as Map<String, dynamic>), 'id': 'new-$group', 'groupId': group, 'authorId': 'lead', 'createdAtUtc': now.toIso8601String(), 'isRead': true}),
+          201,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+    final s = FakeServer({
+      ...server().routes,
+      'GET /supervisor/groups': (_) => [
+            {'id': 'g1', 'name': 'المجموعة الأولى', 'pilgrimCount': 1, 'presentCount': 0, 'absentCount': 1},
+            {'id': 'g2', 'name': 'المجموعة الثانية', 'pilgrimCount': 1, 'presentCount': 0, 'absentCount': 1},
+          ],
+      'GET /groups/g1/announcements': (_) => [ann('old', 'g1', const Duration(days: 1)), ann('company', 'g1', const Duration(hours: 1))],
+      'GET /groups/g2/announcements': (_) => [ann('company', 'g2', const Duration(hours: 1)), ann('recent', 'g2', const Duration(minutes: 1))],
+      'POST /groups/g1/announcements': (r) => created(r, 'g1'),
+      'POST /groups/g2/announcements': (r) => created(r, 'g2'),
+    });
+    final repo = repository(s);
+    final list = await repo.getAnnouncements();
+    expect(list.map((a) => a.id), ['recent', 'company', 'old']);
+    expect(list.first.target, 'المجموعة الثانية');
+
+    Announcement draft(String target, AnnouncementIcon icon) => Announcement(
+        id: 'new', title: 't', target: target, whenLabel: '', summary: '', body: 'b', type: AnnouncementType.normal, icon: icon, dateLabel: '', timeLabel: '');
+    await repo.sendAnnouncement(draft('المجموعة الثانية', AnnouncementIcon.group));
+    expect(s.requests.where((r) => r.method == 'POST').map((r) => r.url.path), ['/api/v1/groups/g2/announcements']);
+    await repo.sendAnnouncement(draft('جميع المعتمرين', AnnouncementIcon.book));
+    expect(s.requests.where((r) => r.method == 'POST').map((r) => r.url.path).skip(1), unorderedEquals(['/api/v1/groups/g1/announcements', '/api/v1/groups/g2/announcements']));
+  });
+
   test('new server: groups with attendance + next activity from the itinerary, members with number, member card, program', () async {
     final tomorrow = DateTime.now().add(const Duration(days: 1));
     String day(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -254,6 +287,26 @@ void main() {
     await cubit.remove(cubit.state.items.first);
     expect(s.requests.any((r) => r.method == 'DELETE' && r.url.path.endsWith('/groups/g1/members/u1')), isTrue);
     expect(cubit.state.items.map((m) => m.name), ['سارة']);
+    await cubit.close();
+  });
+
+  test('supervisor marks attendance: PUT {status}, counts move at once, and roll back when the server refuses', () async {
+    var refuse = false;
+    final s = FakeServer({
+      'GET /groups/g1/members': (_) => [
+            {'userId': 'u1', 'fullName': 'أحمد محمد', 'role': 2, 'memberNumber': 1, 'attendanceStatus': 2},
+          ],
+      'PUT /groups/g1/attendance/u1': (_) => refuse ? http.Response('', 403) : null,
+    });
+    final cubit = GroupMembersCubit(repository(s), 'g1');
+    await cubit.load();
+    expect((cubit.state.presentCount, cubit.state.absentCount), (0, 1));
+    await cubit.setPresent(cubit.state.items.single, true);
+    expect(jsonDecode(s.requests.last.body), {'status': 1});
+    expect((cubit.state.presentCount, cubit.state.absentCount), (1, 0));
+    refuse = true;
+    await expectLater(cubit.setPresent(cubit.state.items.single, false), throwsA(anything));
+    expect((cubit.state.presentCount, cubit.state.absentCount), (1, 0));
     await cubit.close();
   });
 

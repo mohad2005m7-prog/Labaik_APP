@@ -2,6 +2,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/utils/geo_utils.dart';
 import '../../../../core/utils/stream_merge.dart';
 import '../../../auth/data/auth_session.dart';
+import '../../../group/data/models/home_group.dart';
 import '../../../group/data/sources/group_api.dart';
 import '../../../group/data/sources/group_realtime.dart';
 import '../../domain/entities/chat_message.dart';
@@ -40,13 +41,21 @@ class ServerChatRepository implements ChatRepository {
   /// نوع كل محادثة عرفناها (true = مجموعة)
   final _isGroup = <String, bool>{};
 
+  /// /home?groupId= لكل مجموعة مرة وحدة بس (فتح المحادثة كان يطلبها 3 مرات بنفس الوقت)
+  final _groupInfo = <String, Future<HomeGroup?>>{};
+
+  Future<HomeGroup?> _group(String id) => _groupInfo[id] ??= _groups.group(id).then((g) => g, onError: (Object e) {
+        _groupInfo.remove(id); // فشل → المرة الجاية بنعيد
+        throw e;
+      });
+
   Future<bool> _groupOf(String conversationId) async {
     if (conversationId == companyGroupId) return true;
     final known = _isGroup[conversationId];
     if (known != null) return known;
     // محادثة ما مرّت بالقائمة (من مركز المساعدة مثلاً): مجموعة لو هي وحدة من مجموعاتي
     try {
-      return _isGroup[conversationId] = (await _groups.group(conversationId)) != null;
+      return _isGroup[conversationId] = (await _group(conversationId)) != null;
     } catch (_) {
       return _isGroup[conversationId] = false;
     }
@@ -148,7 +157,7 @@ class ServerChatRepository implements ChatRepository {
   Future<ChatRoom> room(String conversationId) async {
     if (conversationId == companyGroupId) return const ChatRoom(isGroup: true, readOnly: true);
     if (!await _groupOf(conversationId)) return ChatRoom.direct;
-    final g = await _groups.group(conversationId);
+    final g = await _group(conversationId);
     return ChatRoom(isGroup: true, isSupervisor: g?.isLeader ?? false, onlySupervisorCanPost: g?.onlySupervisorCanPost ?? false, mutedUntil: g?.mutedUntil);
   }
 

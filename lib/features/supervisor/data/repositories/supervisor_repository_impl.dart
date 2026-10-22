@@ -82,6 +82,16 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
     return next;
   }
 
+  /// المجموعات اللي بشرف عليها (رقم واسم) بنفس ترتيب /supervisor/groups — آخر نسخة وصلت
+  List<({String id, String name})>? _led;
+
+  Future<List<({String id, String name})>> _ledGroups() async {
+    final known = _led;
+    if (known != null) return known;
+    await getGroups();
+    return _led ?? const [];
+  }
+
   @override
   Future<List<SupervisorGroup>> getGroups() async {
     List<Map<String, dynamic>> rows;
@@ -89,8 +99,11 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
       rows = await _supervisor.groups();
     } on ApiException catch (e) {
       if (!e.isMissingOnServer) rethrow;
-      return _legacyGroups();
+      final legacy = await _legacyGroups();
+      _led = [for (final g in legacy) (id: g.id, name: g.name)];
+      return legacy;
     }
+    _led = [for (final g in rows) (id: g['id'].toString(), name: g['name']?.toString() ?? '')];
     _myGroup(refresh: true).ignore();
     for (final g in rows) {
       final tripId = g['tripId']?.toString();
@@ -222,25 +235,40 @@ class SupervisorRepositoryImpl implements SupervisorRepository {
   @override
   Stream<void> chatsChanged() => mergeStreams([GroupRealtime.events.on('MessageReceived'), GroupRealtime.events.on('DirectMessageReceived'), GroupRealtime.events.on('MessageDeleted')]).map((_) {});
 
+  /// إعلانات كل مجموعاتي (مش بس وحدة) — من الأحدث، وإعلان الشركة اللي بيطلع بكل مجموعة بينعرض مرة وحدة
   @override
   Future<List<Announcement>> getAnnouncements() async {
-    final group = await _myGroup();
-    if (group == null) return const [];
+    final groups = await _ledGroups();
+    if (groups.isEmpty) return const [];
     final mine = {for (final a in await _local.announcements()) a.id: a};
-    final items = await _announcements.list(group.id);
-    return [for (final json in items) AnnouncementDto.fromJson(json, target: group.name, local: mine[json['id']?.toString()])];
+    final lists = await Future.wait([for (final g in groups) _announcements.list(g.id)]);
+    final seen = <String>{};
+    final rows = <(Map<String, dynamic>, String)>[
+      for (final (i, items) in lists.indexed)
+        for (final json in items)
+          if (seen.add(json['id']?.toString() ?? '')) (json, groups[i].name),
+    ];
+    DateTime at(Map<String, dynamic> json) => DateTime.tryParse(json['createdAtUtc']?.toString() ?? '') ?? DateTime(0);
+    rows.sort((a, b) => at(b.$1).compareTo(at(a.$1)));
+    return [for (final (json, target) in rows) AnnouncementDto.fromJson(json, target: target, local: mine[json['id']?.toString()])];
   }
 
+  /// للمجموعة اللي اختارها ([Announcement.target] = اسمها، والافتراضي أول مجموعة) —
+  /// "جميع المعتمرين" (أيقونة الكتاب) = لكل مجموعة بيشرف عليها
   @override
   Future<Announcement> sendAnnouncement(Announcement announcement) async {
-    final group = await _myGroup();
+    final groups = await _ledGroups();
     // مش مضاف لمجموعة
-    if (group == null) throw const ApiException(404);
-    final json = await _announcements.post(group.id, title: announcement.title, body: announcement.body, important: announcement.isImportant);
-    final saved = AnnouncementDto.fromJson(json, target: group.name, local: announcement);
+    if (groups.isEmpty) throw const ApiException(404);
+    final toAll = announcement.icon == AnnouncementIcon.book;
+    final targets = toAll ? groups : [groups.firstWhere((g) => g.name == announcement.target, orElse: () => groups.first)];
+    final posted = await Future.wait([
+      for (final g in targets) _announcements.post(g.id, title: announcement.title, body: announcement.body, important: announcement.isImportant),
+    ]);
+    final saved = [for (final json in posted) AnnouncementDto.fromJson(json, target: toAll ? announcement.target : targets.first.name, local: announcement)];
     // النوع والمرفق (مش بالسيرفر) بيضلوا على الجهاز تحت رقم الإعلان بالسيرفر
-    await _local.saveAnnouncements([saved, ...await _local.announcements()]);
-    return saved;
+    await _local.saveAnnouncements([...saved, ...await _local.announcements()]);
+    return saved.first;
   }
 
   @override

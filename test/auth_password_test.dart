@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -7,12 +8,15 @@ import 'package:http/http.dart' as http;
 import 'package:labaik/core/network/api_exception.dart';
 import 'package:labaik/core/network/api_client.dart';
 import 'package:labaik/core/network/session_events.dart';
+import 'package:labaik/core/network/signalr_hub.dart';
+import 'package:labaik/core/utils/password_rules.dart';
 import 'package:labaik/core/l10n/app_language.dart';
 import 'package:labaik/core/utils/token_storage.dart';
 import 'package:labaik/features/auth/data/auth_api_service.dart';
 import 'package:labaik/features/auth/data/auth_session.dart';
 import 'package:labaik/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:labaik/features/auth/presentation/pages/create_new_password_screen.dart';
+import 'package:labaik/features/group/data/sources/group_realtime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 String _jwt(Map<String, Object?> claims) => 'h.${base64Url.encode(utf8.encode(jsonEncode(claims))).replaceAll('=', '')}.s';
@@ -109,4 +113,50 @@ void main() {
     }
     expect(codes, hasLength(6));
   });
+
+  test('password rules match the server (Identity): 8+, upper, lower, digit, symbol — Arabic letters are not symbols', () {
+    for (final ok in ['Passw0rd!x1', 'Tmp#2026ab', 'aB3\$efgh']) {
+      expect(PasswordRules.isStrong(ok), isTrue, reason: ok);
+    }
+    for (final weak in ['Password1', 'password1!', 'PASSWORD1!', 'Password!', 'Pa1!', 'Passwordمم1']) {
+      expect(PasswordRules.isStrong(weak), isFalse, reason: weak);
+    }
+  });
+
+  test('AccountBlocked from the server (company stopped from the dashboard) signs out at once, only while watching', () async {
+    final codes = <String?>[];
+    SessionEvents.handler = codes.add;
+    final hub = StreamController<List<Object?>>.broadcast();
+    final original = GroupRealtime.events;
+    GroupRealtime.events = _AccountHub(hub.stream);
+    addTearDown(() {
+      GroupRealtime.reset();
+      GroupRealtime.events = original;
+      SessionEvents.handler = null;
+      SessionEvents.reset();
+    });
+    GroupRealtime.watchAccount();
+    GroupRealtime.watchAccount(); // مستمع واحد بس
+    hub.add([
+      {'code': 'Company.Stopped'},
+    ]);
+    await Future<void>.delayed(Duration.zero);
+    expect(codes, ['Company.Stopped']);
+    GroupRealtime.reset(); // طلع → ما عاد يسمع
+    SessionEvents.reset();
+    hub.add([
+      {'code': 'Supervisor.Suspended'},
+    ]);
+    await Future<void>.delayed(Duration.zero);
+    expect(codes, ['Company.Stopped']);
+  });
+}
+
+class _AccountHub extends SignalRHub {
+  _AccountHub(this.stream) : super(uri: Uri.parse('ws://fake'), accessToken: () async => null);
+
+  final Stream<List<Object?>> stream;
+
+  @override
+  Stream<List<Object?>> on(String target) => target == 'AccountBlocked' ? stream : const Stream.empty();
 }

@@ -39,6 +39,9 @@ class GroupMember extends Equatable {
     this.notes,
   });
 
+  GroupMember withPresence(bool value) =>
+      GroupMember(id: id, name: name, photo: photo, present: value, number: number, gender: gender, email: email, nationality: nationality, health: health, notes: notes);
+
   @override
   List<Object?> get props => [id, name, photo, present, number, gender, email, nationality, health, notes];
 }

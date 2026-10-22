@@ -62,7 +62,9 @@ class ApiClient {
   Future<Object?> _send(Future<http.Response> Function(Map<String, String> headers) request) async {
     try {
       var response = await request(_headers(await accessToken())).timeout(timeout);
-      if (response.statusCode == 401 || response.statusCode == 403) {
+      // التوكن انتهى (401)، أو صلاحياته قديمة (403 بدون كود — مثلاً صار مشرف بعد ما انعمل التوكن) → تجديد ومحاولة وحدة
+      // أما 403 بكود (خدمة مقفلة، مش مشرف المجموعة، الحساب موقوف…) فالتجديد ما بيغيّر إشي — ما بنضيّع طلبين زيادة
+      if (response.statusCode == 401 || (response.statusCode == 403 && _problemCode(response) == null)) {
         final renewed = await refreshToken();
         if (renewed != null && renewed.isNotEmpty) {
           response = await request(_headers(renewed)).timeout(timeout);

@@ -61,9 +61,14 @@ class SupervisorHomeScreen extends StatelessWidget {
                 top: 395,
                 width: 361,
                 height: 200,
-                child: Align(
+                // FittedBox: الرسالة وزر إعادة المحاولة بيضلوا كاملين على الشاشات الصغيرة وتكبير الخط
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
                   alignment: Alignment.topCenter,
-                  child: SupListStatus(loaded: state.loaded, failed: state.failed, isEmpty: true, empty: SupListStatusText.noGroups, onRetry: context.read<SupervisorGroupsCubit>().load),
+                  child: SizedBox(
+                    width: c.s.x(361),
+                    child: SupListStatus(loaded: state.loaded, failed: state.failed, isEmpty: true, empty: SupListStatusText.noGroups, onRetry: context.read<SupervisorGroupsCubit>().load),
+                  ),
                 ),
               );
             }

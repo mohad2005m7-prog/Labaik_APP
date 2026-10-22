@@ -37,25 +37,50 @@ abstract class _ListCubit<T> extends Cubit<ListState<T>> {
 
   Future<List<T>> fetch();
 
-  Future<void> load() async {
+  /// تحميل واحد بنفس الوقت: لو انطلب تحميل وهو شغّال بنعيد مرة وحدة بعده (آخر البيانات) — بدل طلبات متراكبة
+  /// بترجع بترتيب عشوائي
+  Future<void>? _loading;
+  bool _again = false;
+
+  Future<void> load() {
+    if (_loading != null) {
+      _again = true;
+      return _loading!;
+    }
+    return _loading = _run();
+  }
+
+  Future<void> _run() async {
     try {
-      final items = await fetch();
-      if (!isClosed) emit(state.copyWith(loaded: true, items: items, failed: false));
-    } catch (_) {
-      // ما في إنترنت أو السيرفر ما رد — بنضل على آخر بيانات وصلت
-      if (!isClosed) emit(state.copyWith(loaded: true, failed: true));
+      do {
+        _again = false;
+        try {
+          final items = await fetch();
+          if (!isClosed) emit(state.copyWith(loaded: true, items: items, failed: false));
+        } catch (_) {
+          // ما في إنترنت أو السيرفر ما رد — بنضل على آخر بيانات وصلت
+          if (!isClosed) emit(state.copyWith(loaded: true, failed: true));
+        }
+      } while (_again && !isClosed);
+    } finally {
+      _loading = null;
     }
   }
 
   void search(String query) => emit(state.copyWith(query: query));
 
   StreamSubscription<void>? _changes;
+  Timer? _debounce;
 
-  /// تحديث لحظي: كل ما وصل جديد من السيرفر بنعيد التحميل
-  void watch(Stream<void> changes) => _changes ??= changes.listen((_) => load(), onError: (_) {});
+  /// تحديث لحظي: كل ما وصل جديد من السيرفر بنعيد التحميل — دفعة رسائل ورا بعض = تحميل واحد (بعد 700ms)
+  void watch(Stream<void> changes) => _changes ??= changes.listen((_) {
+        _debounce?.cancel();
+        _debounce = Timer(const Duration(milliseconds: 700), load);
+      }, onError: (_) {});
 
   @override
   Future<void> close() async {
+    _debounce?.cancel();
     await _changes?.cancel();
     return super.close();
   }
@@ -97,6 +122,19 @@ class GroupMembersCubit extends _ListCubit<GroupMember> {
   Future<void> add({required String email, String? fullName, String? phone}) async {
     await _repository.addMember(groupId, email: email, fullName: fullName, phone: phone);
     await load();
+  }
+
+  /// تسجيل الحضور يدوياً (حاضر / غير حاضر) — بيتغيّر فوراً، ولو السيرفر رفض بيرجع زي ما كان
+  Future<void> setPresent(GroupMember member, bool present) async {
+    List<GroupMember> mark(bool value) => [for (final m in state.items) m.id == member.id ? m.withPresence(value) : m];
+    final before = member.present;
+    emit(state.copyWith(items: mark(present)));
+    try {
+      await _repository.setAttendance(groupId, member.id, present: present);
+    } catch (_) {
+      if (!isClosed && before != null) emit(state.copyWith(items: mark(before)));
+      rethrow;
+    }
   }
 
   /// إزالة معتمر — بيختفي فوراً من القائمة

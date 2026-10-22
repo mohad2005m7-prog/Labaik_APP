@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/l10n/tx.dart';
 import '../../../../core/theme/figma_text.dart';
 import '../../../../core/utils/figma_canvas.dart';
 import '../../../company/presentation/l10n/company_forms_text.dart';
@@ -12,6 +13,7 @@ import '../../domain/repositories/supervisor_repository.dart';
 import '../controllers/supervisor_controller.dart';
 import '../cubits/supervisor_content_cubits.dart';
 import '../l10n/group_members_text.dart';
+import '../widgets/sup_list_status.dart';
 import '../widgets/supervisor_colors.dart';
 import '../widgets/supervisor_page.dart';
 import '../widgets/supervisor_widgets.dart';
@@ -125,6 +127,13 @@ class _MembersList extends StatelessWidget {
     return BlocBuilder<GroupMembersCubit, ListState<GroupMember>>(
       builder: (context, state) {
         final members = state.visible(tab);
+        // قبل ما يرد السيرفر / فشل / فاضي → حالة واضحة بدل قائمة بيضاء
+        if (members.isEmpty) {
+          return SingleChildScrollView(
+            physics: supScrollPhysics,
+            child: SupListStatus(loaded: state.loaded, failed: state.failed, isEmpty: true, empty: SupListStatusText.noMembers, onRetry: context.read<GroupMembersCubit>().load),
+          );
+        }
         return ListView.builder(
           padding: EdgeInsets.zero,
           physics: supScrollPhysics,
@@ -149,7 +158,7 @@ class _MembersList extends StatelessWidget {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => SupervisorController.openMember(context, m, groupId: context.read<GroupMembersCubit>().groupId),
-          onLongPress: () => _confirmRemove(context, m),
+          onLongPress: () => _options(context, m),
         ),
       ),
       c.rect(left: 324, top: top + 5, width: 45, height: 45, child: SupPhoto(photo: photo, size: c.s.x(45), name: m.name, heroTag: heroTag)),
@@ -158,6 +167,35 @@ class _MembersList extends StatelessWidget {
       c.text(m.name, left: 60, top: top + 17, width: 255, height: 19, style: supText(c, 16, FigmaWeight.sfBold, SupColors.grey)),
       ...supChevron(c, left: 21, top: top + 16, color: SupColors.grey),
     ];
+  }
+
+  /// الضغط المطوّل: الحضور (السيرفر بيبدأ الكل "غير حاضر" لحد ما المعتمر يأكد وصوله أو المشرف يسجّله) أو الإزالة
+  Future<void> _options(BuildContext context, GroupMember m) async {
+    final cubit = context.read<GroupMembersCubit>();
+    Widget option(BuildContext sheet, IconData icon, Tx label, String value, {Color color = SupColors.green}) => ListTile(
+          leading: Icon(icon, color: color),
+          title: Text(label(), style: TextStyle(fontFamily: 'NotoSansArabic', fontSize: 16, color: color)),
+          onTap: () => Navigator.pop(sheet, value),
+        );
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (sheet) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (m.present != true) option(sheet, Icons.check_circle_outline, GroupMembersText.markPresent, 'present'),
+          if (m.present != false) option(sheet, Icons.highlight_off, GroupMembersText.markAbsent, 'absent'),
+          option(sheet, Icons.person_remove_outlined, GroupMembersText.remove, 'remove', color: SupColors.red),
+        ]),
+      ),
+    );
+    if (!context.mounted || picked == null) return;
+    if (picked == 'remove') return _confirmRemove(context, m);
+    try {
+      await cubit.setPresent(m, picked == 'present');
+    } catch (_) {
+      if (context.mounted) SupervisorController.showMessage(context, GroupMembersText.failed);
+    }
   }
 
   Future<void> _confirmRemove(BuildContext context, GroupMember m) async {

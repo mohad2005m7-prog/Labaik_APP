@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/theme/figma_text.dart';
+import '../../../../core/utils/password_rules.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/google_sign_in_controller.dart';
 import '../l10n/auth_form_text.dart';
@@ -47,7 +48,7 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_email.text.trim().isEmpty) return AuthFormText.enterEmail();
     if (!_emailPattern.hasMatch(_email.text.trim())) return AuthFormText.invalidEmail();
     if (_password.text.isEmpty) return AuthFormText.enterPassword();
-    if (_password.text.length < 6) return SignupText.invalidPassword();
+    if (!PasswordRules.isStrong(_password.text)) return SignupText.invalidPassword();
     if (_confirm.text != _password.text) return SignupText.passwordsMismatch();
     if (!_acceptedTerms) return SignupText.acceptTerms();
     return null;

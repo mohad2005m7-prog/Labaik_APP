@@ -11,7 +11,7 @@ abstract final class SignupText {
   static const login = Tx('تسجيل الدخول', 'Log in');
   static const enterFullName = Tx('يرجى إدخال الاسم كامل', 'Please enter your full name');
   static const invalidFullName = Tx('الاسم يجب أن يكون 3 أحرف على الأقل', 'Name must be at least 3 characters');
-  static const invalidPassword = Tx('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'Password must be at least 6 characters');
+  static const invalidPassword = Tx('كلمة المرور لازم تكون 8 أحرف على الأقل وفيها حرف إنجليزي كبير وحرف صغير ورقم ورمز (مثل ! @ #)', 'The password needs at least 8 characters with an uppercase letter, a lowercase letter, a number and a symbol (like ! @ #)');
   static const confirmPassword = Tx('تأكيد كلمة المرور', 'Confirm password');
   static const passwordsMismatch = Tx('كلمتا المرور غير متطابقتين', "Passwords don't match");
   static const acceptTerms = Tx('يرجى الموافقة على الشروط والأحكام', 'Please accept the Terms & Conditions');

@@ -5,6 +5,7 @@ import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/l10n/common_text.dart';
 import '../../../../core/l10n/tx.dart';
 import '../../../../core/utils/app_launcher.dart';
+import '../../../../core/widgets/busy_overlay.dart';
 import '../../data/repositories/server_chat_repository.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/conversation_summary.dart';
@@ -104,18 +105,19 @@ class ChatsController {
   /// [repository]: مصدر غير السيرفر (مثلاً المحادثات على الجهاز للأقسام المفصولة مؤقتاً عن السيرفر)
   static Future<void> openDirect(BuildContext context, {required String userId, required String name, String? photoUrl, ChatRepository? repository}) async {
     final repo = repository ?? chatRepository();
-    final ConversationSummary conversation;
+    final ConversationSummary? started;
     try {
-      conversation = await repo.startDirect(userId);
+      started = await BusyOverlay.run(context, () => repo.startDirect(userId));
     } catch (error) {
       await repo.dispose();
       if (context.mounted) showMessage(context, ApiErrorText.of(error));
       return;
     }
-    if (!context.mounted) {
+    if (started == null || !context.mounted) {
       await repo.dispose();
       return;
     }
+    final conversation = started;
     await Navigator.push(
       context,
       MaterialPageRoute(
